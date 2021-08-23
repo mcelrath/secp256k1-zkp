@@ -36,8 +36,8 @@ typedef struct {
 
 SECP256K1_API int secp256k1_frost_keygen_init(
     const secp256k1_context *ctx,
-    secp256k1_scalar *coefficients,
-    secp256k1_xonly_pubkey *commitments,
+    secp256k1_scalar *privcoeff,
+    secp256k1_pubkey *pubcoeff,
     const size_t threshold,
     const size_t n_signers,
     const unsigned char *seckey
@@ -54,7 +54,7 @@ SECP256K1_API int secp256k1_frost_pubkey_combine(
     const secp256k1_context *ctx,
     secp256k1_scratch_space *scratch,
     secp256k1_xonly_pubkey *combined_pk,
-    const secp256k1_xonly_pubkey *pubkeys,
+    const secp256k1_pubkey *pubkeys,
     size_t n_pubkeys
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 

@@ -12,14 +12,14 @@
 #include "include/secp256k1_frost.h"
 #include "hash.h"
 
-int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_scalar *coefficients, secp256k1_xonly_pubkey *commitments, const size_t threshold, const size_t n_signers, const unsigned char *seckey) {
+int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_scalar *privcoeff, secp256k1_pubkey *pubcoeff, const size_t threshold, const size_t n_signers, const unsigned char *seckey32) {
      secp256k1_sha256 sha;
      size_t i;
      unsigned char rngseed[32];
 
      VERIFY_CHECK(ctx != NULL);
      ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-     ARG_CHECK(seckey != NULL);
+     ARG_CHECK(seckey32 != NULL);
 
      if (threshold == 0 || threshold > n_signers) {
          return 0;
@@ -28,7 +28,7 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_scalar *
      /* Compute a random seed which commits to all inputs */
      /* TODO: allow user suplied function that takes seckey, threshold, and n_signers as inputs and supplies the rngseed */
      secp256k1_sha256_initialize(&sha);
-     secp256k1_sha256_write(&sha, seckey, 32);
+     secp256k1_sha256_write(&sha, seckey32, 32);
      for (i = 0; i < 8; i++) {
          rngseed[i + 0] = threshold / (1ull << (i * 8));
          rngseed[i + 8] = n_signers / (1ull << (i * 8));
@@ -45,11 +45,11 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_scalar *
          if (i % 2 == 0) {
              secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, i);
          }
-         coefficients[i] = rand[i % 2];
+         privcoeff[i] = rand[i % 2];
          /* Compute commitment to each coefficient */
          secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &rand[i % 2]);
          secp256k1_ge_set_gej(&rp, &rj);
-         secp256k1_xonly_pubkey_save(&commitments[i], &rp);
+         secp256k1_pubkey_save(&pubcoeff[i], &rp);
      }
 
      return 1;
@@ -89,16 +89,16 @@ void secp256k1_frost_aggregate_shares(secp256k1_frost_share *aggregate_share, se
 
 typedef struct {
     const secp256k1_context *ctx;
-    const secp256k1_xonly_pubkey *pks;
+    const secp256k1_pubkey *pks;
 } secp256k1_frost_pubkey_combine_ecmult_data;
 
 static int secp256k1_frost_pubkey_combine_callback(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void *data) {
     secp256k1_frost_pubkey_combine_ecmult_data *ctx = (secp256k1_frost_pubkey_combine_ecmult_data *) data;
     secp256k1_scalar_set_int(sc, 1);
-    return secp256k1_xonly_pubkey_load(ctx->ctx, pt, &ctx->pks[idx]);
+    return secp256k1_pubkey_load(ctx->ctx, pt, &ctx->pks[idx]);
 }
 
-int secp256k1_frost_pubkey_combine(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pk, const secp256k1_xonly_pubkey *pubkeys, size_t n_pubkeys) {
+int secp256k1_frost_pubkey_combine(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pk, const secp256k1_pubkey *pubkeys, size_t n_pubkeys) {
     secp256k1_frost_pubkey_combine_ecmult_data ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
