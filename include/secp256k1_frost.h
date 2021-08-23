@@ -30,6 +30,10 @@ typedef struct {
     unsigned char data[32];
 } secp256k1_frost_share;
 
+typedef struct {
+    unsigned char data[64];
+} secp256k1_frost_secnonce;
+
 SECP256K1_API int secp256k1_frost_keygen_init(
     const secp256k1_context *ctx,
     secp256k1_scalar *coefficients,

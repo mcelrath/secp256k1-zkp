@@ -147,6 +147,93 @@ static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size
 
     secp256k1_scalar_inverse_var(&den, &den);
     secp256k1_scalar_mul(r, &num, &den);
- }
+}
+
+/* Initializes SHA256 with fixed midstate. This midstate was computed by applying
+ * SHA256 to SHA256("FROST/non")||SHA256("FROST/non"). */
+/* TODO: get correct midstate */
+static void secp256k1_nonce_function_frost_sha256_tagged(secp256k1_sha256 *sha) {
+    secp256k1_sha256_initialize(sha);
+    sha->s[0] = 0x791dae43ul;
+    sha->s[1] = 0xe52d3b44ul;
+    sha->s[2] = 0x37f9edeaul;
+    sha->s[3] = 0x9bfd2ab1ul;
+    sha->s[4] = 0xcfb0f44dul;
+    sha->s[5] = 0xccf1d880ul;
+    sha->s[6] = 0xd18f2c13ul;
+    sha->s[7] = 0xa37b9024ul;
+
+    sha->bytes = 64;
+}
+
+/* Initializes SHA256 with fixed midstate. This midstate was computed by applying
+ * SHA256 to SHA256("FROST/aux")||SHA256("FROST/aux"). */
+/* TODO: get correct midstate */
+static void secp256k1_nonce_function_frost_sha256_tagged_aux(secp256k1_sha256 *sha) {
+    secp256k1_sha256_initialize(sha);
+    sha->s[0] = 0xd14c7bd9ul;
+    sha->s[1] = 0x095d35e6ul;
+    sha->s[2] = 0xb8490a88ul;
+    sha->s[3] = 0xfb00ef74ul;
+    sha->s[4] = 0x0baa488ful;
+    sha->s[5] = 0x69366693ul;
+    sha->s[6] = 0x1c81c5baul;
+    sha->s[7] = 0xc33b296aul;
+
+    sha->bytes = 64;
+}
+
+/* algo argument for nonce_function_frost to derive the nonce using a tagged hash function. */
+static const unsigned char frost_algo[9] = "FROST/non";
+
+static int secp256k1_nonce_function_frost(secp256k1_frost_secnonce *k, const unsigned char *session_id, const unsigned char *key32, const unsigned char *msg32, const unsigned char *combined_pk, const unsigned char *algo, size_t algolen, void *data) {
+    secp256k1_sha256 sha;
+    unsigned char masked_key[32];
+    unsigned char rngseed[32];
+    secp256k1_scalar rand[2];
+    int i;
+
+    if (algo == NULL) {
+        return 0;
+    }
+
+    if (data != NULL) {
+        secp256k1_nonce_function_frost_sha256_tagged_aux(&sha);
+        secp256k1_sha256_write(&sha, data, 32);
+        secp256k1_sha256_finalize(&sha, masked_key);
+        for (i = 0; i < 32; i++) {
+            masked_key[i] ^= key32[i];
+        }
+    }
+
+    /* Tag the hash with algo which is important to avoid nonce reuse across
+     * algorithims. An optimized tagging implementation is used if the default
+     * tag is provided. */
+    if (algolen == sizeof(frost_algo)
+            && secp256k1_memcmp_var(algo, frost_algo, algolen) == 0) {
+        secp256k1_nonce_function_frost_sha256_tagged(&sha);
+    } else {
+        secp256k1_sha256_initialize_tagged(&sha, algo, algolen);
+    }
+
+    secp256k1_sha256_write(&sha, session_id, 32);
+    if (data != NULL) {
+        secp256k1_sha256_write(&sha, masked_key, 32);
+    } else {
+        secp256k1_sha256_write(&sha, key32, 32);
+    }
+    secp256k1_sha256_write(&sha, combined_pk, 32);
+    secp256k1_sha256_write(&sha, msg32, 32);
+    secp256k1_sha256_finalize(&sha, rngseed);
+
+    /* Derive nonce from the seed. */
+    /* TODO: it would be nice if we could allow an iteration, perhaps in a different function */
+    /* and index as an optional argument to this one */
+    secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, 0);
+    secp256k1_scalar_get_b32(k->data, &rand[0]);
+    secp256k1_scalar_get_b32(&k->data[32], &rand[1]);
+
+    return 1;
+}
 
 #endif
