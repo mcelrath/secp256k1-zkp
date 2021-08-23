@@ -67,6 +67,16 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_frost_ke
 void secp256k1_frost_generate_shares(secp256k1_frost_share *shares, secp256k1_scalar *coeff, const secp256k1_frost_keygen_session *session) {
     size_t i;
 
+    /* Invert the first coeeficient if the combined pubkey has an odd Y coordinate. We can't wait for signing to invert because it must be done prior to generating the polynomial from which the shares will be derived. */
+    if (session->pk_parity) {
+        /* TODO: do this without overwriting by writing to new scalar value */
+        /* do this within the loop so we only do this check once */
+        /* update test because when it reads from privcoeff it will no longer */
+        /* be inverted */
+        secp256k1_scalar_negate(&coeff[0], &coeff[0]);
+
+    }
+
     for (i = 0; i < session->n_signers; i++) {
         size_t j;
         secp256k1_scalar share_i;
