@@ -146,20 +146,21 @@ static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size
     size_t i;
     secp256k1_scalar num;
     secp256k1_scalar den;
+    secp256k1_scalar idx;
 
     secp256k1_scalar_set_int(&num, 1);
     secp256k1_scalar_set_int(&den, 1);
+    secp256k1_scalar_set_int(&idx, (int) my_index);
     for (i = 0; i < n_participants; i++) {
-        secp256k1_scalar mul, sum;
+        secp256k1_scalar mul;
         if ((int) participant_indexes[i] == (int) my_index) {
             continue;
         }
         secp256k1_scalar_set_int(&mul, (int) participant_indexes[i]);
-        secp256k1_scalar_mul(&num, &num, &mul);
-        secp256k1_scalar_set_int(&mul, (int) my_index);
         secp256k1_scalar_negate(&mul, &mul);
-        secp256k1_scalar_set_int(&sum, (int) participant_indexes[i]);
-        secp256k1_scalar_add(&mul, &mul, &sum);
+        secp256k1_scalar_mul(&num, &num, &mul);
+
+        secp256k1_scalar_add(&mul, &mul, &idx);
         secp256k1_scalar_mul(&den, &den, &mul);
      }
 
