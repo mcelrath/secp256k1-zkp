@@ -142,6 +142,21 @@ int secp256k1_frost_pubkey_combine(const secp256k1_context *ctx, secp256k1_scrat
     return 1;
 }
 
+int secp256k1_frost_nonce_combine(const secp256k1_context* ctx, const secp256k1_pubkey *pubkeys, size_t n_signers, int *nonce_parity, secp256k1_xonly_pubkey *combined_pk) {
+    secp256k1_frost_keygen_session session;
+
+    session.n_signers = n_signers;
+
+    if (!secp256k1_frost_pubkey_combine(ctx, NULL, &session, pubkeys)) {
+        return 0;
+    }
+
+    *nonce_parity = session.pk_parity;
+    *combined_pk = session.combined_pk;
+
+    return 1;
+}
+
 static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size_t *participant_indexes, const size_t n_participants, const size_t my_index) {
     size_t i;
     secp256k1_scalar num;

@@ -73,6 +73,14 @@ SECP256K1_API int secp256k1_frost_pubkey_combine(
     const secp256k1_pubkey *pubkeys
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
+SECP256K1_API int secp256k1_frost_nonce_combine(
+    const secp256k1_context* ctx,
+    const secp256k1_pubkey *pubkeys,
+    size_t n_signers,
+    int *nonce_parity,
+    secp256k1_xonly_pubkey *combined_pk
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+
 #ifdef __cplusplus
 }
 #endif

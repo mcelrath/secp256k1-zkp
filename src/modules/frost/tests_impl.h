@@ -32,6 +32,8 @@ void run_frost_tests(void) {
     secp256k1_keypair keypair;
     secp256k1_frost_secnonce k;
     secp256k1_frost_keygen_session sessions[N_SIGNERS];
+    secp256k1_xonly_pubkey combined_nonce;
+    int combined_nonce_parity;
     int i, j;
 
     /* Round 1.1, 1.2, 1.3, and 1.4 */
@@ -104,9 +106,8 @@ void run_frost_tests(void) {
         secp256k1_ge_set_gej(&rp, &rj);
         secp256k1_pubkey_save(&pubkeys[i], &rp);
     }
-    sessions[0].n_signers = THRESHOLD;
-    CHECK(secp256k1_frost_pubkey_combine(ctx, NULL, &sessions[0], pubkeys));
-    CHECK(secp256k1_xonly_pubkey_serialize(ctx, pk2, &sessions[0].combined_pk));
+    CHECK(secp256k1_frost_nonce_combine(ctx, pubkeys, THRESHOLD, &combined_nonce_parity, &combined_nonce));
+    CHECK(secp256k1_xonly_pubkey_serialize(ctx, pk2, &combined_nonce));
     /* sign */
     for (i = 0; i < THRESHOLD; i++) {
         /* compute challenge hash */
@@ -116,10 +117,10 @@ void run_frost_tests(void) {
         secp256k1_frost_lagrange_coefficient(&l, participants, THRESHOLD, sessions[i].my_index);
         secp256k1_scalar_mul(&s1, &s1, &l);
         secp256k1_scalar_mul(&s2, &s2, &s1);
-        CHECK(secp256k1_xonly_pubkey_serialize(ctx, pk2, &sessions[0].combined_pk));
+        CHECK(secp256k1_xonly_pubkey_serialize(ctx, pk2, &combined_nonce));
         secp256k1_nonce_function_frost(&k, id, sessions[i].agg_share.data, msg, &pk1[1], frost_algo, 9, NULL);
         secp256k1_scalar_set_b32(&s1, k.data, NULL);
-        if (sessions[0].pk_parity) {
+        if (combined_nonce_parity) {
             secp256k1_scalar_negate(&s1, &s1);
 
         }
