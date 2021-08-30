@@ -93,7 +93,7 @@ void secp256k1_frost_generate_shares(secp256k1_frost_share *shares, secp256k1_sc
     }
 }
 
-void secp256k1_frost_aggregate_shares(secp256k1_frost_share *aggregate_share, const secp256k1_frost_share *shares, const secp256k1_frost_keygen_session *session) {
+void secp256k1_frost_aggregate_shares(const secp256k1_frost_share *shares, const secp256k1_frost_keygen_session *session) {
     size_t i;
     secp256k1_scalar acc;
 
@@ -103,7 +103,7 @@ void secp256k1_frost_aggregate_shares(secp256k1_frost_share *aggregate_share, co
         secp256k1_scalar_set_b32(&share_i, shares[i].data, NULL);
         secp256k1_scalar_add(&acc, &acc, &share_i);
     }
-    secp256k1_scalar_get_b32(aggregate_share->data, &acc);
+    secp256k1_scalar_get_b32((unsigned char *) session->agg_share.data, &acc);
 }
 
 typedef struct {

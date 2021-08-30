@@ -41,6 +41,7 @@ typedef struct {
     int pk_parity;
     secp256k1_xonly_pubkey combined_pk;
     secp256k1_pubkey coeff_pk;
+    secp256k1_frost_share agg_share;
 } secp256k1_frost_keygen_session;
 
 SECP256K1_API int secp256k1_frost_keygen_init(
@@ -61,7 +62,6 @@ SECP256K1_API void secp256k1_frost_generate_shares(
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 SECP256K1_API void secp256k1_frost_aggregate_shares(
-    secp256k1_frost_share *aggregate_share,
     const secp256k1_frost_share *shares,
     const secp256k1_frost_keygen_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2);

@@ -25,7 +25,6 @@ void run_frost_tests(void) {
     secp256k1_pubkey pubcoeff[N_SIGNERS][THRESHOLD];
     secp256k1_pubkey pubkeys[N_SIGNERS];
     secp256k1_frost_share shares[N_SIGNERS][N_SIGNERS];
-    secp256k1_frost_share agg_shares[N_SIGNERS];
     secp256k1_scalar l;
     secp256k1_scalar s1, s2;
     secp256k1_gej rj;
@@ -58,7 +57,7 @@ void run_frost_tests(void) {
         }
 
         /* TODO: pull participant share from session */
-        secp256k1_frost_aggregate_shares(&agg_shares[i], rec_shares, &sessions[i]);
+        secp256k1_frost_aggregate_shares(rec_shares, &sessions[i]);
     }
 
     /* Reconstruct secret */
@@ -68,7 +67,7 @@ void run_frost_tests(void) {
     secp256k1_scalar_clear(&s2);
     for (i = 0; i < THRESHOLD; i++) {
         secp256k1_frost_lagrange_coefficient(&l, participants, THRESHOLD, sessions[i].my_index);
-        secp256k1_scalar_set_b32(&s1, agg_shares[i].data, NULL);
+        secp256k1_scalar_set_b32(&s1, sessions[i].agg_share.data, NULL);
         secp256k1_scalar_mul(&s1, &s1, &l);
         secp256k1_scalar_add(&s2, &s2, &s1);
     }
@@ -99,7 +98,7 @@ void run_frost_tests(void) {
     /* TODO: use separate ID for each participant */
     secp256k1_testrand256(id);
     for (i = 0; i < THRESHOLD; i++) {
-        secp256k1_nonce_function_frost(&k, id, agg_shares[i].data, msg, pk2, frost_algo, 9, NULL);
+        secp256k1_nonce_function_frost(&k, id, sessions[i].agg_share.data, msg, pk2, frost_algo, 9, NULL);
         secp256k1_scalar_set_b32(&s1, k.data, NULL);
         secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &s1);
         secp256k1_ge_set_gej(&rp, &rj);
@@ -113,12 +112,12 @@ void run_frost_tests(void) {
         /* compute challenge hash */
         secp256k1_schnorrsig_challenge(&s2, pk2, msg, &pk1[1]);
 
-        secp256k1_scalar_set_b32(&s1, agg_shares[i].data, NULL);
+        secp256k1_scalar_set_b32(&s1, sessions[i].agg_share.data, NULL);
         secp256k1_frost_lagrange_coefficient(&l, participants, THRESHOLD, sessions[i].my_index);
         secp256k1_scalar_mul(&s1, &s1, &l);
         secp256k1_scalar_mul(&s2, &s2, &s1);
         CHECK(secp256k1_xonly_pubkey_serialize(ctx, pk2, &sessions[0].combined_pk));
-        secp256k1_nonce_function_frost(&k, id, agg_shares[i].data, msg, &pk1[1], frost_algo, 9, NULL);
+        secp256k1_nonce_function_frost(&k, id, sessions[i].agg_share.data, msg, &pk1[1], frost_algo, 9, NULL);
         secp256k1_scalar_set_b32(&s1, k.data, NULL);
         if (sessions[0].pk_parity) {
             secp256k1_scalar_negate(&s1, &s1);
