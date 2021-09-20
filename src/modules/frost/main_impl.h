@@ -364,4 +364,22 @@ int secp256k1_frost_sign_init(const secp256k1_context *ctx, secp256k1_pubkey *pu
     return 1;
 }
 
+int secp256k1_frost_aggregate_partial_sigs(const secp256k1_context *ctx, unsigned char sig[64], const secp256k1_frost_partial_signature *p_sigs, const secp256k1_xonly_pubkey *combined_pubnonce, const size_t n_sigs) {
+    secp256k1_scalar s1, s2;
+    size_t i;
+
+    secp256k1_scalar_clear(&s1);
+    for (i = 0; i < n_sigs; i++) {
+        secp256k1_scalar_set_b32(&s2, p_sigs[i].data, NULL);
+        secp256k1_scalar_add(&s1, &s1, &s2);
+    }
+    secp256k1_scalar_get_b32(&sig[32], &s1);
+
+    if (!secp256k1_xonly_pubkey_serialize(ctx, &sig[0], combined_pubnonce)) {
+        return 0;
+    };
+
+    return 1;
+}
+
 #endif

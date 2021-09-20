@@ -109,6 +109,14 @@ SECP256K1_API int secp256k1_frost_partial_sign(
     const size_t *indexes
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(8);
 
+int secp256k1_frost_aggregate_partial_sigs(
+    const secp256k1_context *ctx,
+    unsigned char sig[64],
+    const secp256k1_frost_partial_signature *p_sigs,
+    const secp256k1_xonly_pubkey *combined_pubnonce,
+    const size_t n_sigs
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
 /* TODO: serialization APIs that facilitate communication rounds */
 
 #ifdef __cplusplus

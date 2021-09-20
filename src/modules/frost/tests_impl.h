@@ -140,15 +140,7 @@ void run_frost_tests(void) {
     }
 
     /* combine sigs */
-    secp256k1_scalar_clear(&s1);
-    for (i = 0; i < THRESHOLD; i++) {
-        secp256k1_scalar_set_b32(&s2, partial_sigs[i].data, NULL);
-        secp256k1_scalar_add(&s1, &s1, &s2);
-    }
-    secp256k1_scalar_get_b32(&sig[32], &s1);
-    CHECK(secp256k1_xonly_pubkey_serialize(ctx, pk2, &combined_nonce));
-    memcpy(&sig[0], pk2, 32);
-
+    CHECK(secp256k1_frost_aggregate_partial_sigs(ctx, sig, partial_sigs, &combined_nonce, THRESHOLD));
     CHECK(secp256k1_schnorrsig_verify(ctx, sig, msg, &combined_pk));
 }
 
