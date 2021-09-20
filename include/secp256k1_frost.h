@@ -35,51 +35,81 @@ typedef struct {
 } secp256k1_frost_secnonce;
 
 typedef struct {
+    unsigned char data[32];
+} secp256k1_frost_partial_signature;
+
+typedef struct {
     size_t threshold;
     size_t my_index;
     size_t n_signers;
     int pk_parity;
-    secp256k1_xonly_pubkey combined_pk;
-    secp256k1_pubkey coeff_pk;
-    secp256k1_frost_share agg_share;
+    unsigned char rngseed[32];
+    unsigned char secret[32];
+    secp256k1_ge coeff_ge;
+    secp256k1_scalar my_share;
 } secp256k1_frost_keygen_session;
+
+typedef struct {
+    size_t my_index;
+    secp256k1_scalar nonce;
+    secp256k1_ge nonce_ge;
+    int nonce_parity;
+    unsigned char msg[32];
+    secp256k1_xonly_pubkey combined_pk;
+    secp256k1_frost_share agg_share;
+} secp256k1_frost_sign_session;
 
 SECP256K1_API int secp256k1_frost_keygen_init(
     const secp256k1_context *ctx,
-    secp256k1_frost_keygen_session *session,
-    secp256k1_scalar *privcoeff,
     secp256k1_pubkey *pubcoeff,
+    secp256k1_frost_keygen_session *session,
     const size_t threshold,
     const size_t n_signers,
     const size_t my_index,
-    const unsigned char *seckey
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(8);
+    const unsigned char *seckey32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(7);
 
-SECP256K1_API void secp256k1_frost_generate_shares(
-    secp256k1_frost_share *shares,
-    secp256k1_scalar *coeff,
+
+/* TODO: optionally allow nonce to be loaded into the function for pre-generated nonces */
+SECP256K1_API void secp256k1_frost_sign_init(
+    const secp256k1_context *ctx,
+    secp256k1_pubkey *pubnonce,
+    secp256k1_frost_sign_session *session,
+    const unsigned char *session_id32,
+    const unsigned char *msg32,
+    const secp256k1_xonly_pubkey *combined_pk,
+    secp256k1_frost_share *agg_share,
+    const size_t my_index
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8);
+
+SECP256K1_API void secp256k1_frost_aggregate_shares(
+    secp256k1_frost_share *agg_share,
+    const secp256k1_frost_share *rec_shares,
     const secp256k1_frost_keygen_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-SECP256K1_API void secp256k1_frost_aggregate_shares(
-    const secp256k1_frost_share *shares,
-    const secp256k1_frost_keygen_session *session
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2);
-
-SECP256K1_API int secp256k1_frost_pubkey_combine(
+SECP256K1_API int secp256k1_frost_gen_shares_and_pubkey(
     const secp256k1_context *ctx,
     secp256k1_scratch_space *scratch,
+    secp256k1_frost_share *shares,
+    secp256k1_xonly_pubkey *combined_pk,
     secp256k1_frost_keygen_session *session,
-    const secp256k1_pubkey *pubkeys
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+    const secp256k1_pubkey *rec_pubcoeff
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
-SECP256K1_API int secp256k1_frost_nonce_combine(
-    const secp256k1_context* ctx,
-    const secp256k1_pubkey *pubkeys,
-    size_t n_signers,
-    int *nonce_parity,
-    secp256k1_xonly_pubkey *combined_pk
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+/* TODO: this n_signers means something different than the other n_signers */
+SECP256K1_API int secp256k1_frost_partial_sign(
+    const secp256k1_context *ctx,
+    secp256k1_scratch_space *scratch,
+    secp256k1_frost_partial_signature *partial_sig,
+    secp256k1_xonly_pubkey *combined_pubnonce,
+    secp256k1_frost_sign_session *session,
+    const secp256k1_pubkey *rec_pubnonce,
+    const size_t n_signers,
+    const size_t *indexes
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(8);
+
+/* TODO: serialization APIs that facilitate communication rounds */
 
 #ifdef __cplusplus
 }
