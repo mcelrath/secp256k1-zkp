@@ -205,13 +205,13 @@ static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size
 
     secp256k1_scalar_set_int(&num, 1);
     secp256k1_scalar_set_int(&den, 1);
-    secp256k1_scalar_set_int(&idx, (int) my_index);
+    secp256k1_scalar_set_int(&idx, my_index);
     for (i = 0; i < n_participants; i++) {
         secp256k1_scalar mul;
-        if ((int) participant_indexes[i] == (int) my_index) {
+        if (participant_indexes[i] == my_index) {
             continue;
         }
-        secp256k1_scalar_set_int(&mul, (int) participant_indexes[i]);
+        secp256k1_scalar_set_int(&mul, participant_indexes[i]);
         secp256k1_scalar_negate(&mul, &mul);
         secp256k1_scalar_mul(&num, &num, &mul);
 
@@ -226,7 +226,7 @@ static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size
 int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_frost_partial_signature *partial_sig, secp256k1_xonly_pubkey *combined_pubnonce, secp256k1_frost_sign_session *session, const secp256k1_pubkey *rec_pubnonce, const size_t n_signers, const size_t *indexes) {
     unsigned char pubnonce[32];
     unsigned char pk[32];
-    secp256k1_scalar c, x, l;
+    secp256k1_scalar s, x, l;
 
     if (!secp256k1_frost_nonce_combine(ctx, scratch, combined_pubnonce, session, rec_pubnonce, n_signers)) {
         return 0;
@@ -241,18 +241,18 @@ int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch
     }
 
     /* compute challenge hash */
-    secp256k1_schnorrsig_challenge(&c, pubnonce, session->msg, pk);
+    secp256k1_schnorrsig_challenge(&s, pubnonce, session->msg, pk);
     secp256k1_scalar_set_b32(&x, session->agg_share.data, NULL);
     secp256k1_frost_lagrange_coefficient(&l, indexes, n_signers, session->my_index);
     secp256k1_scalar_mul(&x, &x, &l);
-    secp256k1_scalar_mul(&c, &c, &x);
+    secp256k1_scalar_mul(&s, &s, &x);
 
     if (session->nonce_parity) {
         /* TODO: don't overwite nonce */
         secp256k1_scalar_negate(&session->nonce, &session->nonce);
     }
-    secp256k1_scalar_add(&c, &c, &session->nonce);
-    secp256k1_scalar_get_b32(partial_sig->data, &c);
+    secp256k1_scalar_add(&s, &s, &session->nonce);
+    secp256k1_scalar_get_b32(partial_sig->data, &s);
 
     return 1;
 }
@@ -344,7 +344,7 @@ static int secp256k1_nonce_function_frost(secp256k1_frost_secnonce *k, const uns
     return 1;
 }
 
-void secp256k1_frost_sign_init(const secp256k1_context *ctx, secp256k1_pubkey *pubnonce, secp256k1_frost_sign_session *session, const unsigned char *session_id32, const unsigned char *msg32, const secp256k1_xonly_pubkey *combined_pk, secp256k1_frost_share *agg_share, const size_t my_index) {
+int secp256k1_frost_sign_init(const secp256k1_context *ctx, secp256k1_pubkey *pubnonce, secp256k1_frost_sign_session *session, const unsigned char *session_id32, const unsigned char *msg32, const secp256k1_xonly_pubkey *combined_pk, secp256k1_frost_share *agg_share, const size_t my_index) {
     secp256k1_frost_secnonce k;
     secp256k1_gej rj;
 
@@ -353,11 +353,15 @@ void secp256k1_frost_sign_init(const secp256k1_context *ctx, secp256k1_pubkey *p
     memcpy(session->combined_pk.data, combined_pk->data, 64);
     memcpy(session->agg_share.data, agg_share->data, 32);
 
-    secp256k1_nonce_function_frost(&k, session_id32, agg_share->data, msg32, combined_pk->data, frost_algo, 9, NULL);
+    if (!secp256k1_nonce_function_frost(&k, session_id32, agg_share->data, msg32, combined_pk->data, frost_algo, 9, NULL)) {
+        return 0;
+    };
     secp256k1_scalar_set_b32(&session->nonce, k.data, NULL);
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &session->nonce);
     secp256k1_ge_set_gej(&session->nonce_ge, &rj);
     secp256k1_pubkey_save(pubnonce, &session->nonce_ge);
+
+    return 1;
 }
 
 #endif

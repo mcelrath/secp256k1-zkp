@@ -71,7 +71,7 @@ SECP256K1_API int secp256k1_frost_keygen_init(
 
 
 /* TODO: optionally allow nonce to be loaded into the function for pre-generated nonces */
-SECP256K1_API void secp256k1_frost_sign_init(
+SECP256K1_API int secp256k1_frost_sign_init(
     const secp256k1_context *ctx,
     secp256k1_pubkey *pubnonce,
     secp256k1_frost_sign_session *session,

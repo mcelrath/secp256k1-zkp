@@ -120,7 +120,7 @@ void run_frost_tests(void) {
     /* Generate nonces */
     for (i = 0; i < THRESHOLD; i++) {
         secp256k1_testrand256(id);
-        secp256k1_frost_sign_init(ctx, &pubkeys[i], &sign_sessions[i], id, msg, &combined_pk, &agg_shares[i], i+1);
+        CHECK(secp256k1_frost_sign_init(ctx, &pubkeys[i], &sign_sessions[i], id, msg, &combined_pk, &agg_shares[i], i+1));
     }
 
     for (i = 0; i < THRESHOLD; i++) {
