@@ -2,7 +2,6 @@
 #define SECP256K1_MODULE_FROST_TESTS_H
 
 #include "include/secp256k1_frost.h"
-#include <secp256k1_musig.h>
 
  /* Number of public keys involved in creating the aggregate signature */
 #define N_SIGNERS 5
