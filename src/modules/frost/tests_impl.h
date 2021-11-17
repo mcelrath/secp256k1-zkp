@@ -42,25 +42,7 @@ void run_frost_tests(void) {
     /* Round 1.1, 1.2, 1.3, and 1.4 */
     for (i = 0; i < N_SIGNERS; i++) {
         secp256k1_testrand256(signer_secrets[i].sk);
-        CHECK(secp256k1_frost_keygen_init(ctx, pubcoeff[i], &keygen_sessions[i], THRESHOLD, N_SIGNERS, i+1, signer_secrets[i].sk));
-    }
-
-    for (i = 0; i < N_SIGNERS; i++) {
-        secp256k1_pubkey rec_pubcoeff[N_SIGNERS - 1][THRESHOLD];
-        n = 0;
-
-        /* Coefficient commitments received from other participants via broadcast */
-        for (j = 0; j < N_SIGNERS; j++) {
-            if (j == i) {
-                continue;
-            }
-            memcpy(rec_pubcoeff[n], pubcoeff[j], sizeof(rec_pubcoeff[n]));
-            n++;
-        }
-
-        /* Round 2.4 */
-        /* We deviate slightly from the FROST protocol so we can generate an x-only 32-byte BIP340 compatible keypair, which requires combining the public keys prior to generating shares. */
-        CHECK(secp256k1_frost_gen_shares_and_pubkey(ctx, NULL, shares[i], &combined_pk, &keygen_sessions[i], &rec_pubcoeff[0][0]));
+        CHECK(secp256k1_frost_keygen_init(ctx, pubcoeff[i], shares[i], &keygen_sessions[i], THRESHOLD, N_SIGNERS, i+1, signer_secrets[i].sk));
     }
 
     /* Round 2.3 */
@@ -77,6 +59,23 @@ void run_frost_tests(void) {
         }
 
         secp256k1_frost_aggregate_shares(&agg_shares[i], rec_shares, &keygen_sessions[i]);
+    }
+
+    for (i = 0; i < N_SIGNERS; i++) {
+        secp256k1_pubkey rec_pubcoeff[N_SIGNERS - 1][THRESHOLD];
+        n = 0;
+
+        /* Coefficient commitments received from other participants via broadcast */
+        for (j = 0; j < N_SIGNERS; j++) {
+            if (j == i) {
+                continue;
+            }
+            memcpy(rec_pubcoeff[n], pubcoeff[j], sizeof(rec_pubcoeff[n]));
+            n++;
+        }
+
+        /* Round 2.4 */
+        CHECK(secp256k1_frost_pubkey_combine(ctx, NULL, &combined_pk, &keygen_sessions[i], &rec_pubcoeff[0][0]));
     }
 
     /* Reconstruct secret */
