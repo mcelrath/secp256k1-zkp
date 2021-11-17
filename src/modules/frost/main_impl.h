@@ -71,7 +71,6 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
 }
 
 static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, secp256k1_frost_keygen_session *session) {
-    /* secp256k1_sha256 sha; */
     size_t i;
     int overflow;
     secp256k1_scalar const_term;
