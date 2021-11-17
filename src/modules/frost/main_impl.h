@@ -81,11 +81,6 @@ static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, secp25
         return 0;
     }
 
-    /* Invert the first coeeficient if the combined pubkey has an odd Y coordinate. We can't wait for signing to invert because it must be done prior to generating the polynomial from which the shares will be derived. */
-    if (session->pk_parity == 1) {
-        secp256k1_scalar_negate(&const_term, &const_term);
-    }
-
     for (i = 0; i < session->n_signers; i++) {
         size_t j;
         secp256k1_scalar share_i;
@@ -126,6 +121,10 @@ void secp256k1_frost_aggregate_shares(secp256k1_frost_share *agg_share, const se
         secp256k1_scalar_add(&acc, &acc, &share_i);
     }
     secp256k1_scalar_add(&acc, &acc, &session->my_share);
+    /* Invert the aggregate share if the combined pubkey has an odd Y coordinate. */
+    if (session->pk_parity == 1) {
+        secp256k1_scalar_negate(&acc, &acc);
+    }
     secp256k1_scalar_get_b32((unsigned char *) agg_share->data, &acc);
 }
 
