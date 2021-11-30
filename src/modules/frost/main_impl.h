@@ -12,17 +12,10 @@
 #include "include/secp256k1_frost.h"
 #include "hash.h"
 
-static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, secp256k1_frost_keygen_session *session) {
+static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, const secp256k1_scalar *secret, const unsigned char *rngseed, const size_t n_signers, const size_t threshold) {
     size_t i;
-    int overflow;
-    secp256k1_scalar const_term;
 
-    secp256k1_scalar_set_b32(&const_term, session->secret, &overflow);
-    if (overflow) {
-        return 0;
-    }
-
-    for (i = 0; i < session->n_signers; i++) {
+    for (i = 0; i < n_signers; i++) {
         size_t j;
         secp256k1_scalar share_i;
         secp256k1_scalar scalar_i;
@@ -30,27 +23,23 @@ static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, secp25
 
         secp256k1_scalar_clear(&share_i);
         secp256k1_scalar_set_int(&scalar_i, i + 1);
-        for (j = 0; j < session->threshold - 1; j++) {
+        for (j = 0; j < threshold - 1; j++) {
             if (j % 2 == 0) {
-                secp256k1_scalar_chacha20(&rand[0], &rand[1], session->rngseed, j);
+                secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, j);
             }
 
             /* Horner's method to evaluate polynomial to derive shares */
             secp256k1_scalar_add(&share_i, &share_i, &rand[j % 2]);
             secp256k1_scalar_mul(&share_i, &share_i, &scalar_i);
         }
-        secp256k1_scalar_add(&share_i, &share_i, &const_term);
+        secp256k1_scalar_add(&share_i, &share_i, secret);
         secp256k1_scalar_get_b32(shares[i].data, &share_i);
-
-        if (i == session->my_index - 1) {
-            memcpy(&session->my_share, &share_i, sizeof(share_i));
-        }
     }
 
     return 1;
 }
 
-int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, secp256k1_frost_keygen_session *session, const size_t threshold, const size_t n_signers, const size_t my_index, const unsigned char *seckey32) {
+int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, secp256k1_frost_keygen_session *session, const size_t threshold, const size_t n_signers, const unsigned char *seckey32) {
     secp256k1_sha256 sha;
     size_t i;
     int overflow;
@@ -67,7 +56,6 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
     }
 
     session->threshold = threshold;
-    session->my_index = my_index;
     session->n_signers = n_signers;
     memcpy(session->secret, seckey32, 32);
 
@@ -78,9 +66,8 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
     for (i = 0; i < 8; i++) {
         session->rngseed[i + 0] = threshold / (1ull << (i * 8));
         session->rngseed[i + 8] = n_signers / (1ull << (i * 8));
-        session->rngseed[i + 16] = my_index / (1ull << (i * 8));
     }
-    secp256k1_sha256_write(&sha, session->rngseed, 24);
+    secp256k1_sha256_write(&sha, session->rngseed, 16);
     secp256k1_sha256_finalize(&sha, session->rngseed);
 
     secp256k1_scalar_set_b32(&const_term, session->secret, &overflow);
@@ -105,30 +92,11 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
         secp256k1_pubkey_save(&pubcoeff[i + 1], &rp);
     }
 
-    if (!secp256k1_frost_generate_shares(shares, session)) {
+    if (!secp256k1_frost_generate_shares(shares, &const_term, session->rngseed, n_signers, threshold)) {
         return 0;
     }
 
     return 1;
-}
-
-void secp256k1_frost_aggregate_shares(secp256k1_frost_share *agg_share, const secp256k1_frost_share *rec_shares, const secp256k1_frost_keygen_session *session) {
-    size_t i;
-    secp256k1_scalar acc;
-
-    secp256k1_scalar_clear(&acc);
-    for (i = 0; i < session->n_signers - 1; i++) {
-        secp256k1_scalar share_i;
-
-        secp256k1_scalar_set_b32(&share_i, rec_shares[i].data, NULL);
-        secp256k1_scalar_add(&acc, &acc, &share_i);
-    }
-    secp256k1_scalar_add(&acc, &acc, &session->my_share);
-    /* Invert the aggregate share if the combined pubkey has an odd Y coordinate. */
-    if (session->pk_parity == 1) {
-        secp256k1_scalar_negate(&acc, &acc);
-    }
-    secp256k1_scalar_get_b32((unsigned char *) agg_share->data, &acc);
 }
 
 typedef struct {
@@ -142,6 +110,51 @@ static int secp256k1_frost_pubkey_combine_callback(secp256k1_scalar *sc, secp256
     secp256k1_scalar_set_int(sc, 1);
     /* the public key is the first index of each set of coefficients */
     return secp256k1_pubkey_load(ctx->ctx, pt, ctx->pks + (idx * ctx->threshold));
+}
+
+int secp256k1_frost_keygen_finalize(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *combined_pk, const secp256k1_frost_share *shares, const secp256k1_pubkey *pubcoeff, const size_t n_signers, const size_t threshold) {
+    secp256k1_frost_pubkey_combine_ecmult_data ecmult_data;
+    secp256k1_gej pkj;
+    secp256k1_ge pkp;
+    int pk_parity;
+    size_t i;
+    secp256k1_scalar acc;
+
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
+    ARG_CHECK(pubcoeff != NULL);
+    ARG_CHECK(n_signers > 0);
+
+    /* Combine pubkeys */
+    ecmult_data.ctx = ctx;
+    ecmult_data.pks = pubcoeff;
+    ecmult_data.threshold = threshold;
+
+    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_frost_pubkey_combine_callback, (void *) &ecmult_data, n_signers)) {
+        return 0;
+    }
+
+    secp256k1_ge_set_gej(&pkp, &pkj);
+    secp256k1_fe_normalize_var(&pkp.y);
+    pk_parity = secp256k1_extrakeys_ge_even_y(&pkp);
+    secp256k1_xonly_pubkey_save(combined_pk, &pkp);
+
+    /* Compute combined shares */
+    secp256k1_scalar_clear(&acc);
+    for (i = 0; i < n_signers; i++) {
+        secp256k1_scalar share_i;
+
+        secp256k1_scalar_set_b32(&share_i, shares[i].data, NULL);
+        secp256k1_scalar_add(&acc, &acc, &share_i);
+    }
+
+    /* Invert the aggregate share if the combined pubkey has an odd Y coordinate. */
+    if (pk_parity == 1) {
+        secp256k1_scalar_negate(&acc, &acc);
+    }
+    secp256k1_scalar_get_b32((unsigned char *) agg_share->data, &acc);
+
+    return 1;
 }
 
 int secp256k1_frost_pubkey_combine(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pk, secp256k1_frost_keygen_session *session, const secp256k1_pubkey *rec_pubcoeff) {

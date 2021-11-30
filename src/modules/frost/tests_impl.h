@@ -29,7 +29,7 @@ void run_frost_tests(void) {
     secp256k1_frost_share shares[N_SIGNERS][N_SIGNERS];
     secp256k1_frost_share agg_shares[N_SIGNERS];
     secp256k1_scalar l;
-    secp256k1_scalar s1, s2, s3;
+    secp256k1_scalar s1, s2;
     secp256k1_gej rj;
     secp256k1_ge rp;
     secp256k1_keypair keypair;
@@ -42,53 +42,26 @@ void run_frost_tests(void) {
     /* Round 1.1, 1.2, 1.3, and 1.4 */
     for (i = 0; i < N_SIGNERS; i++) {
         secp256k1_testrand256(signer_secrets[i].sk);
-        CHECK(secp256k1_frost_keygen_init(ctx, pubcoeff[i], shares[i], &keygen_sessions[i], THRESHOLD, N_SIGNERS, i+1, signer_secrets[i].sk));
+        CHECK(secp256k1_frost_keygen_init(ctx, pubcoeff[i], shares[i], &keygen_sessions[i], THRESHOLD, N_SIGNERS, signer_secrets[i].sk));
     }
 
-    /* We deviate slightly from the FROST protocol by combining the public keys
-     * in round 2.4 prior to aggregating the shares in round 2.3. This allows
-     * us to conditionally negate the aggregated share when it is derived so it
-     * corresponds with the x-only aggregate public key. */
     for (i = 0; i < N_SIGNERS; i++) {
-        secp256k1_pubkey rec_pubcoeff[N_SIGNERS - 1][THRESHOLD];
-        n = 0;
+        secp256k1_frost_share my_shares[N_SIGNERS];
 
-        /* Coefficient commitments received from other participants via broadcast */
         for (j = 0; j < N_SIGNERS; j++) {
-            if (j == i) {
-                continue;
-            }
-            memcpy(rec_pubcoeff[n], pubcoeff[j], sizeof(rec_pubcoeff[n]));
-            n++;
+            memcpy(&my_shares[j], &shares[j][i], sizeof(my_shares[j]));
         }
-
-        /* Round 2.4 */
-        CHECK(secp256k1_frost_pubkey_combine(ctx, NULL, &combined_pk, &keygen_sessions[i], &rec_pubcoeff[0][0]));
-    }
-
-    /* Round 2.3 */
-    for (i = 0; i < N_SIGNERS; i++) {
-        secp256k1_frost_share rec_shares[N_SIGNERS - 1];
-
-        n = 0;
-        for (j = 0; j < N_SIGNERS; j++) {
-            if (j == i) {
-                continue;
-            }
-            memcpy(&rec_shares[n], &shares[j][i], sizeof(rec_shares[n]));
-            n++;
-        }
-
-        secp256k1_frost_aggregate_shares(&agg_shares[i], rec_shares, &keygen_sessions[i]);
+        /* TODO: sort pubkeys to determine index */
+        CHECK(secp256k1_frost_keygen_finalize(ctx, NULL, &agg_shares[i], &combined_pk, my_shares, &pubcoeff[0][0], N_SIGNERS, THRESHOLD));
     }
 
     /* Reconstruct secret */
     for (i = 0; i < THRESHOLD; i++) {
-        participants[i] = keygen_sessions[i].my_index;
+        participants[i] = i+1;
     }
     secp256k1_scalar_clear(&s2);
     for (i = 0; i < THRESHOLD; i++) {
-        secp256k1_frost_lagrange_coefficient(&l, participants, THRESHOLD, keygen_sessions[i].my_index);
+        secp256k1_frost_lagrange_coefficient(&l, participants, THRESHOLD, i+1);
         secp256k1_scalar_set_b32(&s1, agg_shares[i].data, NULL);
         secp256k1_scalar_mul(&s1, &s1, &l);
         secp256k1_scalar_add(&s2, &s2, &s1);
@@ -101,20 +74,11 @@ void run_frost_tests(void) {
     CHECK(secp256k1_ec_pubkey_serialize(ctx, pk1, &size, &pubkeys[0], SECP256K1_EC_COMPRESSED));
     CHECK(secp256k1_xonly_pubkey_serialize(ctx, pk2, &combined_pk));
     CHECK(secp256k1_memcmp_var(&pk1[1], pk2, 32) == 0);
-    secp256k1_scalar_clear(&s1);
-    for (i = 0; i < N_SIGNERS; i++) {
-        secp256k1_scalar_set_b32(&s3, keygen_sessions[i].secret, NULL);
-        if (keygen_sessions[i].pk_parity == 1) {
-            secp256k1_scalar_negate(&s3, &s3);
-        }
-        secp256k1_scalar_add(&s1, &s1, &s3);
-    }
-    CHECK(secp256k1_scalar_eq(&s1, &s2));
 
     /* Test signing */
     secp256k1_testrand256(msg);
 
-    secp256k1_scalar_get_b32(sk, &s1);
+    secp256k1_scalar_get_b32(sk, &s2);
     CHECK(secp256k1_keypair_create(ctx, &keypair, sk));
     CHECK(secp256k1_schnorrsig_sign(ctx, sig, msg, &keypair, NULL, NULL));
     CHECK(secp256k1_schnorrsig_verify(ctx, sig, msg, &combined_pk));

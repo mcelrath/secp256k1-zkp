@@ -66,9 +66,19 @@ SECP256K1_API int secp256k1_frost_keygen_init(
     secp256k1_frost_keygen_session *session,
     const size_t threshold,
     const size_t n_signers,
-    const size_t my_index,
     const unsigned char *seckey32
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(8);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(7);
+
+SECP256K1_API int secp256k1_frost_keygen_finalize(
+    const secp256k1_context *ctx,
+    secp256k1_scratch_space *scratch,
+    secp256k1_frost_share *agg_share,
+    secp256k1_xonly_pubkey *combined_pk,
+    const secp256k1_frost_share *shares,
+    const secp256k1_pubkey *pubcoeff,
+    const size_t n_signers,
+    const size_t threshold
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 
 /* TODO: optionally allow nonce to be loaded into the function for pre-generated nonces */
@@ -82,20 +92,6 @@ SECP256K1_API int secp256k1_frost_sign_init(
     secp256k1_frost_share *agg_share,
     const size_t my_index
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8);
-
-SECP256K1_API void secp256k1_frost_aggregate_shares(
-    secp256k1_frost_share *agg_share,
-    const secp256k1_frost_share *rec_shares,
-    const secp256k1_frost_keygen_session *session
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
-
-SECP256K1_API int secp256k1_frost_pubkey_combine(
-    const secp256k1_context *ctx,
-    secp256k1_scratch_space *scratch,
-    secp256k1_xonly_pubkey *combined_pk,
-    secp256k1_frost_keygen_session *session,
-    const secp256k1_pubkey *rec_pubcoeff
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
 /* TODO: this n_signers means something different than the other n_signers */
 SECP256K1_API int secp256k1_frost_partial_sign(
