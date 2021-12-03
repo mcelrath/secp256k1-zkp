@@ -33,16 +33,15 @@ void run_frost_tests(void) {
     secp256k1_gej rj;
     secp256k1_ge rp;
     secp256k1_keypair keypair;
-    secp256k1_frost_keygen_session keygen_sessions[N_SIGNERS];
     secp256k1_frost_sign_session sign_sessions[THRESHOLD];
     secp256k1_xonly_pubkey combined_nonce;
     secp256k1_xonly_pubkey combined_pk;
-    int i, j, n;
+    int i, j;
 
     /* Round 1.1, 1.2, 1.3, and 1.4 */
     for (i = 0; i < N_SIGNERS; i++) {
         secp256k1_testrand256(signer_secrets[i].sk);
-        CHECK(secp256k1_frost_keygen_init(ctx, pubcoeff[i], shares[i], &keygen_sessions[i], THRESHOLD, N_SIGNERS, signer_secrets[i].sk));
+        CHECK(secp256k1_frost_keygen_init(ctx, pubcoeff[i], shares[i], THRESHOLD, N_SIGNERS, signer_secrets[i].sk));
     }
 
     for (i = 0; i < N_SIGNERS; i++) {
@@ -90,19 +89,7 @@ void run_frost_tests(void) {
     }
 
     for (i = 0; i < THRESHOLD; i++) {
-        secp256k1_pubkey rec_pubnonce[THRESHOLD - 1];
-
-        n = 0;
-        for (j = 0; j < THRESHOLD; j++) {
-            if (j == i) {
-                continue;
-            }
-
-            memcpy(&rec_pubnonce[n], &pubkeys[j], sizeof(rec_pubnonce[n]));
-            n++;
-        }
-
-        CHECK(secp256k1_frost_partial_sign(ctx, NULL, &partial_sigs[i], &combined_nonce, &sign_sessions[i], rec_pubnonce, THRESHOLD, participants));
+        CHECK(secp256k1_frost_partial_sign(ctx, NULL, &partial_sigs[i], &combined_nonce, &sign_sessions[i], pubkeys, THRESHOLD, participants));
     }
 
     /* combine sigs */

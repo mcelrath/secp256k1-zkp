@@ -39,13 +39,14 @@ static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, const 
     return 1;
 }
 
-int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, secp256k1_frost_keygen_session *session, const size_t threshold, const size_t n_signers, const unsigned char *seckey32) {
+int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, const size_t threshold, const size_t n_signers, const unsigned char *seckey32) {
     secp256k1_sha256 sha;
     size_t i;
     int overflow;
     secp256k1_scalar const_term;
     secp256k1_gej rj;
     secp256k1_ge rp;
+    unsigned char rngseed[32];
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
@@ -55,28 +56,23 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
         return 0;
     }
 
-    session->threshold = threshold;
-    session->n_signers = n_signers;
-    memcpy(session->secret, seckey32, 32);
-
     /* Compute seed which commits to all inputs */
     /* TODO: allow user suplied function that takes seckey, threshold, and n_signers as inputs and supplies the rngseed */
     secp256k1_sha256_initialize(&sha);
     secp256k1_sha256_write(&sha, seckey32, 32);
     for (i = 0; i < 8; i++) {
-        session->rngseed[i + 0] = threshold / (1ull << (i * 8));
-        session->rngseed[i + 8] = n_signers / (1ull << (i * 8));
+        rngseed[i + 0] = threshold / (1ull << (i * 8));
+        rngseed[i + 8] = n_signers / (1ull << (i * 8));
     }
-    secp256k1_sha256_write(&sha, session->rngseed, 16);
-    secp256k1_sha256_finalize(&sha, session->rngseed);
+    secp256k1_sha256_write(&sha, rngseed, 16);
+    secp256k1_sha256_finalize(&sha, rngseed);
 
-    secp256k1_scalar_set_b32(&const_term, session->secret, &overflow);
+    secp256k1_scalar_set_b32(&const_term, seckey32, &overflow);
     if (overflow) {
         return 0;
     }
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &const_term);
     secp256k1_ge_set_gej(&rp, &rj);
-    secp256k1_ge_set_gej(&session->coeff_ge, &rj);
     secp256k1_pubkey_save(&pubcoeff[0], &rp);
 
     /* Derive coefficients from the seed. */
@@ -84,7 +80,7 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
         secp256k1_scalar rand[2];
 
         if (i % 2 == 0) {
-            secp256k1_scalar_chacha20(&rand[0], &rand[1], session->rngseed, i);
+            secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, i);
         }
         /* Compute commitment to each coefficient */
         secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &rand[i % 2]);
@@ -92,7 +88,7 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
         secp256k1_pubkey_save(&pubcoeff[i + 1], &rp);
     }
 
-    if (!secp256k1_frost_generate_shares(shares, &const_term, session->rngseed, n_signers, threshold)) {
+    if (!secp256k1_frost_generate_shares(shares, &const_term, rngseed, n_signers, threshold)) {
         return 0;
     }
 
@@ -157,49 +153,6 @@ int secp256k1_frost_keygen_finalize(const secp256k1_context *ctx, secp256k1_scra
     return 1;
 }
 
-int secp256k1_frost_pubkey_combine(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pk, secp256k1_frost_keygen_session *session, const secp256k1_pubkey *rec_pubcoeff) {
-    secp256k1_frost_pubkey_combine_ecmult_data ecmult_data;
-    secp256k1_gej pkj;
-    secp256k1_ge pkp;
-
-    VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
-    ARG_CHECK(rec_pubcoeff != NULL);
-    ARG_CHECK(session->n_signers > 0);
-
-    ecmult_data.ctx = ctx;
-    ecmult_data.pks = rec_pubcoeff;
-    ecmult_data.threshold = session->threshold;
-
-    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_frost_pubkey_combine_callback, (void *) &ecmult_data, session->n_signers - 1)) {
-        return 0;
-    }
-    secp256k1_gej_add_ge_var(&pkj, &pkj, &session->coeff_ge, NULL);
-
-    secp256k1_ge_set_gej(&pkp, &pkj);
-    secp256k1_fe_normalize_var(&pkp.y);
-    session->pk_parity = secp256k1_extrakeys_ge_even_y(&pkp);
-    secp256k1_xonly_pubkey_save(combined_pk, &pkp);
-
-    return 1;
-}
-
-static int secp256k1_frost_nonce_combine(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pubnonce, secp256k1_frost_sign_session *sign_session, const secp256k1_pubkey *rec_pubnonce, size_t n_signers) {
-    secp256k1_frost_keygen_session keygen_session;
-
-    keygen_session.n_signers = n_signers;
-    keygen_session.threshold = 1;
-    memcpy(&keygen_session.coeff_ge, &sign_session->nonce_ge, sizeof(keygen_session.coeff_ge));
-
-    if (!secp256k1_frost_pubkey_combine(ctx, scratch, combined_pubnonce, &keygen_session, rec_pubnonce)) {
-        return 0;
-    }
-
-    sign_session->nonce_parity = keygen_session.pk_parity;
-
-    return 1;
-}
-
 static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size_t *participant_indexes, const size_t n_participants, const size_t my_index) {
     size_t i;
     secp256k1_scalar num;
@@ -226,16 +179,36 @@ static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size
     secp256k1_scalar_mul(r, &num, &den);
 }
 
-int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_frost_partial_signature *partial_sig, secp256k1_xonly_pubkey *combined_pubnonce, secp256k1_frost_sign_session *session, const secp256k1_pubkey *rec_pubnonce, const size_t n_signers, const size_t *indexes) {
-    unsigned char pubnonce[32];
+static int secp256k1_frost_pubnonce_combine_callback(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void *data) {
+    secp256k1_frost_pubkey_combine_ecmult_data *ctx = (secp256k1_frost_pubkey_combine_ecmult_data *) data;
+    secp256k1_scalar_set_int(sc, 1);
+    return secp256k1_pubkey_load(ctx->ctx, pt, &ctx->pks[idx]);
+}
+
+int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_frost_partial_signature *partial_sig, secp256k1_xonly_pubkey *combined_pubnonce, secp256k1_frost_sign_session *session, const secp256k1_pubkey *pubnonce, const size_t n_signers, const size_t *indexes) {
+    secp256k1_frost_pubkey_combine_ecmult_data ecmult_data;
+    secp256k1_gej pkj;
+    secp256k1_ge pkp;
+    unsigned char buf[32];
     unsigned char pk[32];
     secp256k1_scalar s, x, l;
+    int pubnonce_parity;
 
-    if (!secp256k1_frost_nonce_combine(ctx, scratch, combined_pubnonce, session, rec_pubnonce, n_signers)) {
+    /* Combine pubkeys */
+    ecmult_data.ctx = ctx;
+    ecmult_data.pks = pubnonce;
+    ecmult_data.threshold = n_signers;
+
+    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_frost_pubnonce_combine_callback, (void *) &ecmult_data, n_signers)) {
         return 0;
     }
 
-    if (!secp256k1_xonly_pubkey_serialize(ctx, pubnonce, combined_pubnonce)) {
+    secp256k1_ge_set_gej(&pkp, &pkj);
+    secp256k1_fe_normalize_var(&pkp.y);
+    pubnonce_parity = secp256k1_extrakeys_ge_even_y(&pkp);
+    secp256k1_xonly_pubkey_save(combined_pubnonce, &pkp);
+
+    if (!secp256k1_xonly_pubkey_serialize(ctx, buf, combined_pubnonce)) {
         return 0;
     }
 
@@ -244,13 +217,13 @@ int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch
     }
 
     /* compute challenge hash */
-    secp256k1_schnorrsig_challenge(&s, pubnonce, session->msg, pk);
+    secp256k1_schnorrsig_challenge(&s, buf, session->msg, pk);
     secp256k1_scalar_set_b32(&x, session->agg_share.data, NULL);
     secp256k1_frost_lagrange_coefficient(&l, indexes, n_signers, session->my_index);
     secp256k1_scalar_mul(&x, &x, &l);
     secp256k1_scalar_mul(&s, &s, &x);
 
-    if (session->nonce_parity) {
+    if (pubnonce_parity) {
         /* TODO: don't overwite nonce */
         secp256k1_scalar_negate(&session->nonce, &session->nonce);
     }

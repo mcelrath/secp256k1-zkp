@@ -39,17 +39,6 @@ typedef struct {
 } secp256k1_frost_partial_signature;
 
 typedef struct {
-    size_t threshold;
-    size_t my_index;
-    size_t n_signers;
-    int pk_parity;
-    unsigned char rngseed[32];
-    unsigned char secret[32];
-    secp256k1_ge coeff_ge;
-    secp256k1_scalar my_share;
-} secp256k1_frost_keygen_session;
-
-typedef struct {
     size_t my_index;
     secp256k1_scalar nonce;
     secp256k1_ge nonce_ge;
@@ -63,11 +52,10 @@ SECP256K1_API int secp256k1_frost_keygen_init(
     const secp256k1_context *ctx,
     secp256k1_pubkey *pubcoeff,
     secp256k1_frost_share *shares,
-    secp256k1_frost_keygen_session *session,
     const size_t threshold,
     const size_t n_signers,
     const unsigned char *seckey32
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(7);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(6);
 
 SECP256K1_API int secp256k1_frost_keygen_finalize(
     const secp256k1_context *ctx,
