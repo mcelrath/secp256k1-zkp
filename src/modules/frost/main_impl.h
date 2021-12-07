@@ -194,7 +194,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch
     secp256k1_scalar s, x, l;
     int pubnonce_parity;
 
-    /* Combine pubkeys */
+    /* Combine pubnonces */
     ecmult_data.ctx = ctx;
     ecmult_data.pks = pubnonce;
     ecmult_data.threshold = n_signers;
