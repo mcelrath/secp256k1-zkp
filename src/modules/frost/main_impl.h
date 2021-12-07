@@ -197,7 +197,6 @@ int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch
     /* Combine pubnonces */
     ecmult_data.ctx = ctx;
     ecmult_data.pks = pubnonce;
-    ecmult_data.threshold = n_signers;
 
     if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_frost_pubnonce_combine_callback, (void *) &ecmult_data, n_signers)) {
         return 0;
