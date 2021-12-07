@@ -323,6 +323,7 @@ static int secp256k1_nonce_function_frost(secp256k1_frost_secnonce *k, const uns
 int secp256k1_frost_sign_init(const secp256k1_context *ctx, secp256k1_pubkey *pubnonce, secp256k1_frost_sign_session *session, const unsigned char *session_id32, const unsigned char *msg32, const secp256k1_xonly_pubkey *combined_pk, secp256k1_frost_share *agg_share, const size_t my_index) {
     secp256k1_frost_secnonce k;
     secp256k1_gej rj;
+    secp256k1_ge nonce_ge;
 
     session->my_index = my_index;
     memcpy(session->msg, msg32, 32);
@@ -334,8 +335,8 @@ int secp256k1_frost_sign_init(const secp256k1_context *ctx, secp256k1_pubkey *pu
     };
     secp256k1_scalar_set_b32(&session->nonce, k.data, NULL);
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &session->nonce);
-    secp256k1_ge_set_gej(&session->nonce_ge, &rj);
-    secp256k1_pubkey_save(pubnonce, &session->nonce_ge);
+    secp256k1_ge_set_gej(&nonce_ge, &rj);
+    secp256k1_pubkey_save(pubnonce, &nonce_ge);
 
     return 1;
 }

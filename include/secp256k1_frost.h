@@ -41,7 +41,6 @@ typedef struct {
 typedef struct {
     size_t my_index;
     secp256k1_scalar nonce;
-    secp256k1_ge nonce_ge;
     int nonce_parity;
     unsigned char msg[32];
     secp256k1_xonly_pubkey combined_pk;
