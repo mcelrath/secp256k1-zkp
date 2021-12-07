@@ -12,10 +12,10 @@
 #include "include/secp256k1_frost.h"
 #include "hash.h"
 
-static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, const secp256k1_scalar *secret, const unsigned char *rngseed, const size_t n_signers, const size_t threshold) {
+static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, const secp256k1_scalar *secret, const unsigned char *rngseed, const size_t n_participants, const size_t threshold) {
     size_t i;
 
-    for (i = 0; i < n_signers; i++) {
+    for (i = 0; i < n_participants; i++) {
         size_t j;
         secp256k1_scalar share_i;
         secp256k1_scalar scalar_i;
@@ -39,7 +39,7 @@ static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, const 
     return 1;
 }
 
-int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, const size_t threshold, const size_t n_signers, const unsigned char *seckey32) {
+int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, const size_t threshold, const size_t n_participants, const unsigned char *seckey32) {
     secp256k1_sha256 sha;
     size_t i;
     int overflow;
@@ -52,17 +52,17 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     ARG_CHECK(seckey32 != NULL);
 
-    if (threshold == 0 || threshold > n_signers) {
+    if (threshold == 0 || threshold > n_participants) {
         return 0;
     }
 
     /* Compute seed which commits to all inputs */
-    /* TODO: allow user suplied function that takes seckey, threshold, and n_signers as inputs and supplies the rngseed */
+    /* TODO: allow user suplied function that takes seckey, threshold, and n_participants as inputs and supplies the rngseed */
     secp256k1_sha256_initialize(&sha);
     secp256k1_sha256_write(&sha, seckey32, 32);
     for (i = 0; i < 8; i++) {
         rngseed[i + 0] = threshold / (1ull << (i * 8));
-        rngseed[i + 8] = n_signers / (1ull << (i * 8));
+        rngseed[i + 8] = n_participants / (1ull << (i * 8));
     }
     secp256k1_sha256_write(&sha, rngseed, 16);
     secp256k1_sha256_finalize(&sha, rngseed);
@@ -88,7 +88,7 @@ int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *
         secp256k1_pubkey_save(&pubcoeff[i + 1], &rp);
     }
 
-    if (!secp256k1_frost_generate_shares(shares, &const_term, rngseed, n_signers, threshold)) {
+    if (!secp256k1_frost_generate_shares(shares, &const_term, rngseed, n_participants, threshold)) {
         return 0;
     }
 
@@ -108,7 +108,7 @@ static int secp256k1_frost_pubkey_combine_callback(secp256k1_scalar *sc, secp256
     return secp256k1_pubkey_load(ctx->ctx, pt, ctx->pks + (idx * ctx->threshold));
 }
 
-int secp256k1_frost_keygen_finalize(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *combined_pk, const secp256k1_frost_share *shares, const secp256k1_pubkey *pubcoeff, const size_t n_signers, const size_t threshold) {
+int secp256k1_frost_keygen_finalize(const secp256k1_context *ctx, secp256k1_scratch_space *scratch, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *combined_pk, const secp256k1_frost_share *shares, const secp256k1_pubkey *pubcoeff, const size_t n_participants, const size_t threshold) {
     secp256k1_frost_pubkey_combine_ecmult_data ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
@@ -119,14 +119,14 @@ int secp256k1_frost_keygen_finalize(const secp256k1_context *ctx, secp256k1_scra
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(pubcoeff != NULL);
-    ARG_CHECK(n_signers > 0);
+    ARG_CHECK(n_participants > 0);
 
     /* Combine pubkeys */
     ecmult_data.ctx = ctx;
     ecmult_data.pks = pubcoeff;
     ecmult_data.threshold = threshold;
 
-    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_frost_pubkey_combine_callback, (void *) &ecmult_data, n_signers)) {
+    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_frost_pubkey_combine_callback, (void *) &ecmult_data, n_participants)) {
         return 0;
     }
 
@@ -137,7 +137,7 @@ int secp256k1_frost_keygen_finalize(const secp256k1_context *ctx, secp256k1_scra
 
     /* Compute combined shares */
     secp256k1_scalar_clear(&acc);
-    for (i = 0; i < n_signers; i++) {
+    for (i = 0; i < n_participants; i++) {
         secp256k1_scalar share_i;
 
         secp256k1_scalar_set_b32(&share_i, shares[i].data, NULL);
