@@ -79,8 +79,8 @@ void run_frost_tests(void) {
 
     secp256k1_scalar_get_b32(sk, &s2);
     CHECK(secp256k1_keypair_create(ctx, &keypair, sk));
-    CHECK(secp256k1_schnorrsig_sign(ctx, sig, msg, &keypair, NULL, NULL));
-    CHECK(secp256k1_schnorrsig_verify(ctx, sig, msg, &combined_pk));
+    CHECK(secp256k1_schnorrsig_sign(ctx, sig, msg, &keypair, NULL));
+    CHECK(secp256k1_schnorrsig_verify(ctx, sig, msg, sizeof(msg), &combined_pk));
 
     /* Generate nonces */
     for (i = 0; i < THRESHOLD; i++) {
@@ -94,7 +94,7 @@ void run_frost_tests(void) {
 
     /* combine sigs */
     CHECK(secp256k1_frost_aggregate_partial_sigs(ctx, sig, partial_sigs, &combined_nonce, THRESHOLD));
-    CHECK(secp256k1_schnorrsig_verify(ctx, sig, msg, &combined_pk));
+    CHECK(secp256k1_schnorrsig_verify(ctx, sig, msg, sizeof(msg), &combined_pk));
 }
 
 #endif /* SECP256K1_MODULE_FROST_TESTS_H */

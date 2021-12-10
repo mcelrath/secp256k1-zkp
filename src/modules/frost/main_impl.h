@@ -117,7 +117,6 @@ int secp256k1_frost_keygen_finalize(const secp256k1_context *ctx, secp256k1_scra
     secp256k1_scalar acc;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(pubcoeff != NULL);
     ARG_CHECK(n_participants > 0);
 
@@ -126,7 +125,7 @@ int secp256k1_frost_keygen_finalize(const secp256k1_context *ctx, secp256k1_scra
     ecmult_data.pks = pubcoeff;
     ecmult_data.threshold = threshold;
 
-    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_frost_pubkey_combine_callback, (void *) &ecmult_data, n_participants)) {
+    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, scratch, &pkj, NULL, secp256k1_frost_pubkey_combine_callback, (void *) &ecmult_data, n_participants)) {
         return 0;
     }
 
@@ -198,7 +197,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch
     ecmult_data.ctx = ctx;
     ecmult_data.pks = pubnonce;
 
-    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_frost_pubnonce_combine_callback, (void *) &ecmult_data, n_signers)) {
+    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, scratch, &pkj, NULL, secp256k1_frost_pubnonce_combine_callback, (void *) &ecmult_data, n_signers)) {
         return 0;
     }
 
@@ -216,7 +215,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context *ctx, secp256k1_scratch
     }
 
     /* compute challenge hash */
-    secp256k1_schnorrsig_challenge(&s, buf, session->msg, pk);
+    secp256k1_schnorrsig_challenge(&s, buf, session->msg, sizeof(session->msg), pk);
     secp256k1_scalar_set_b32(&x, session->agg_share.data, NULL);
     secp256k1_frost_lagrange_coefficient(&l, indexes, n_signers, session->my_index);
     secp256k1_scalar_mul(&x, &x, &l);
