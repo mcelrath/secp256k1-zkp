@@ -11,6 +11,7 @@ bench_internal
 tests
 exhaustive_tests
 gen_context
+gen_ecmult_static_pre_g
 valgrind_ctime_test
 *.exe
 *.so
@@ -25,6 +26,7 @@ aclocal.m4
 autom4te.cache/
 config.log
 config.status
+conftest*
 *.tar.gz
 *.la
 libtool
@@ -35,6 +37,14 @@ libtool
 *~
 *.log
 *.trs
+
+coverage/
+coverage.html
+coverage.*.html
+*.gcda
+*.gcno
+*.gcov
+
 src/libsecp256k1-config.h
 src/libsecp256k1-config.h.in
 src/ecmult_static_context.h
@@ -54,3 +64,5 @@ build-aux/test-driver
 src/stamp-h1
 libsecp256k1.pc
 contrib/gh-pr-create.sh
+
+example_musig

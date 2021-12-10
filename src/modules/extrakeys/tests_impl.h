@@ -7,7 +7,7 @@
 #ifndef SECP256K1_MODULE_EXTRAKEYS_TESTS_H
 #define SECP256K1_MODULE_EXTRAKEYS_TESTS_H
 
-#include "secp256k1_extrakeys.h"
+#include "../../../include/secp256k1_extrakeys.h"
 
 static secp256k1_context* api_test_context(int flags, int *ecount) {
     secp256k1_context *ctx0 = secp256k1_context_create(flags);
@@ -137,6 +137,43 @@ void test_xonly_pubkey(void) {
     secp256k1_context_destroy(verify);
 }
 
+void test_xonly_pubkey_comparison(void) {
+    unsigned char pk1_ser[32] = {
+        0x58, 0x84, 0xb3, 0xa2, 0x4b, 0x97, 0x37, 0x88, 0x92, 0x38, 0xa6, 0x26, 0x62, 0x52, 0x35, 0x11,
+        0xd0, 0x9a, 0xa1, 0x1b, 0x80, 0x0b, 0x5e, 0x93, 0x80, 0x26, 0x11, 0xef, 0x67, 0x4b, 0xd9, 0x23
+    };
+    const unsigned char pk2_ser[32] = {
+        0xde, 0x36, 0x0e, 0x87, 0x59, 0x8f, 0x3c, 0x01, 0x36, 0x2a, 0x2a, 0xb8, 0xc6, 0xf4, 0x5e, 0x4d,
+        0xb2, 0xc2, 0xd5, 0x03, 0xa7, 0xf9, 0xf1, 0x4f, 0xa8, 0xfa, 0x95, 0xa8, 0xe9, 0x69, 0x76, 0x1c
+    };
+    secp256k1_xonly_pubkey pk1;
+    secp256k1_xonly_pubkey pk2;
+    int ecount = 0;
+    secp256k1_context *none = api_test_context(SECP256K1_CONTEXT_NONE, &ecount);
+
+    CHECK(secp256k1_xonly_pubkey_parse(none, &pk1, pk1_ser) == 1);
+    CHECK(secp256k1_xonly_pubkey_parse(none, &pk2, pk2_ser) == 1);
+
+    CHECK(secp256k1_xonly_pubkey_cmp(none, NULL, &pk2) < 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, NULL) > 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, &pk2) < 0);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk2, &pk1) > 0);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, &pk1) == 0);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk2, &pk2) == 0);
+    CHECK(ecount == 2);
+    memset(&pk1, 0, sizeof(pk1)); /* illegal pubkey */
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, &pk2) < 0);
+    CHECK(ecount == 3);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, &pk1) == 0);
+    CHECK(ecount == 5);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk2, &pk1) > 0);
+    CHECK(ecount == 6);
+
+    secp256k1_context_destroy(none);
+}
+
 void test_xonly_pubkey_tweak(void) {
     unsigned char zeros64[64] = { 0 };
     unsigned char overflows[32];
@@ -160,19 +197,19 @@ void test_xonly_pubkey_tweak(void) {
     CHECK(secp256k1_xonly_pubkey_from_pubkey(none, &internal_xonly_pk, &pk_parity, &internal_pk) == 1);
 
     ecount = 0;
-    CHECK(secp256k1_xonly_pubkey_tweak_add(none, &output_pk, &internal_xonly_pk, tweak) == 0);
-    CHECK(ecount == 1);
-    CHECK(secp256k1_xonly_pubkey_tweak_add(sign, &output_pk, &internal_xonly_pk, tweak) == 0);
-    CHECK(ecount == 2);
+    CHECK(secp256k1_xonly_pubkey_tweak_add(none, &output_pk, &internal_xonly_pk, tweak) == 1);
+    CHECK(ecount == 0);
+    CHECK(secp256k1_xonly_pubkey_tweak_add(sign, &output_pk, &internal_xonly_pk, tweak) == 1);
+    CHECK(ecount == 0);
     CHECK(secp256k1_xonly_pubkey_tweak_add(verify, &output_pk, &internal_xonly_pk, tweak) == 1);
     CHECK(secp256k1_xonly_pubkey_tweak_add(verify, NULL, &internal_xonly_pk, tweak) == 0);
-    CHECK(ecount == 3);
+    CHECK(ecount == 1);
     CHECK(secp256k1_xonly_pubkey_tweak_add(verify, &output_pk, NULL, tweak) == 0);
-    CHECK(ecount == 4);
+    CHECK(ecount == 2);
     /* NULL internal_xonly_pk zeroes the output_pk */
     CHECK(secp256k1_memcmp_var(&output_pk, zeros64, sizeof(output_pk)) == 0);
     CHECK(secp256k1_xonly_pubkey_tweak_add(verify, &output_pk, &internal_xonly_pk, NULL) == 0);
-    CHECK(ecount == 5);
+    CHECK(ecount == 3);
     /* NULL tweak zeroes the output_pk */
     CHECK(secp256k1_memcmp_var(&output_pk, zeros64, sizeof(output_pk)) == 0);
 
@@ -237,20 +274,20 @@ void test_xonly_pubkey_tweak_check(void) {
     CHECK(secp256k1_xonly_pubkey_tweak_add(verify, &output_pk, &internal_xonly_pk, tweak) == 1);
     CHECK(secp256k1_xonly_pubkey_from_pubkey(verify, &output_xonly_pk, &pk_parity, &output_pk) == 1);
     CHECK(secp256k1_xonly_pubkey_serialize(ctx, buf32, &output_xonly_pk) == 1);
-    CHECK(secp256k1_xonly_pubkey_tweak_add_check(none, buf32, pk_parity, &internal_xonly_pk, tweak) == 0);
-    CHECK(ecount == 1);
-    CHECK(secp256k1_xonly_pubkey_tweak_add_check(sign, buf32, pk_parity, &internal_xonly_pk, tweak) == 0);
-    CHECK(ecount == 2);
+    CHECK(secp256k1_xonly_pubkey_tweak_add_check(none, buf32, pk_parity, &internal_xonly_pk, tweak) == 1);
+    CHECK(ecount == 0);
+    CHECK(secp256k1_xonly_pubkey_tweak_add_check(sign, buf32, pk_parity, &internal_xonly_pk, tweak) == 1);
+    CHECK(ecount == 0);
     CHECK(secp256k1_xonly_pubkey_tweak_add_check(verify, buf32, pk_parity, &internal_xonly_pk, tweak) == 1);
     CHECK(secp256k1_xonly_pubkey_tweak_add_check(verify, NULL, pk_parity, &internal_xonly_pk, tweak) == 0);
-    CHECK(ecount == 3);
+    CHECK(ecount == 1);
     /* invalid pk_parity value */
     CHECK(secp256k1_xonly_pubkey_tweak_add_check(verify, buf32, 2, &internal_xonly_pk, tweak) == 0);
-    CHECK(ecount == 3);
+    CHECK(ecount == 1);
     CHECK(secp256k1_xonly_pubkey_tweak_add_check(verify, buf32, pk_parity, NULL, tweak) == 0);
-    CHECK(ecount == 4);
+    CHECK(ecount == 2);
     CHECK(secp256k1_xonly_pubkey_tweak_add_check(verify, buf32, pk_parity, &internal_xonly_pk, NULL) == 0);
-    CHECK(ecount == 5);
+    CHECK(ecount == 3);
 
     memset(tweak, 1, sizeof(tweak));
     CHECK(secp256k1_xonly_pubkey_from_pubkey(ctx, &internal_xonly_pk, NULL, &internal_pk) == 1);
@@ -269,7 +306,7 @@ void test_xonly_pubkey_tweak_check(void) {
     CHECK(secp256k1_xonly_pubkey_tweak_add_check(ctx, output_pk32, pk_parity, &internal_xonly_pk, overflows) == 0);
     CHECK(secp256k1_xonly_pubkey_tweak_add(ctx, &output_pk, &internal_xonly_pk, overflows) == 0);
     CHECK(secp256k1_memcmp_var(&output_pk, zeros64, sizeof(output_pk)) == 0);
-    CHECK(ecount == 5);
+    CHECK(ecount == 3);
 
     secp256k1_context_destroy(none);
     secp256k1_context_destroy(sign);
@@ -442,15 +479,15 @@ void test_keypair_add(void) {
     memset(overflows, 0xFF, 32);
     CHECK(secp256k1_keypair_create(ctx, &keypair, sk) == 1);
 
-    CHECK(secp256k1_keypair_xonly_tweak_add(none, &keypair, tweak) == 0);
-    CHECK(ecount == 1);
-    CHECK(secp256k1_keypair_xonly_tweak_add(sign, &keypair, tweak) == 0);
-    CHECK(ecount == 2);
+    CHECK(secp256k1_keypair_xonly_tweak_add(none, &keypair, tweak) == 1);
+    CHECK(ecount == 0);
+    CHECK(secp256k1_keypair_xonly_tweak_add(sign, &keypair, tweak) == 1);
+    CHECK(ecount == 0);
     CHECK(secp256k1_keypair_xonly_tweak_add(verify, &keypair, tweak) == 1);
     CHECK(secp256k1_keypair_xonly_tweak_add(verify, NULL, tweak) == 0);
-    CHECK(ecount == 3);
+    CHECK(ecount == 1);
     CHECK(secp256k1_keypair_xonly_tweak_add(verify, &keypair, NULL) == 0);
-    CHECK(ecount == 4);
+    CHECK(ecount == 2);
     /* This does not set the keypair to zeroes */
     CHECK(secp256k1_memcmp_var(&keypair, zeros96, sizeof(keypair)) != 0);
 
@@ -534,16 +571,167 @@ void test_keypair_add(void) {
     secp256k1_context_destroy(verify);
 }
 
+static void test_hsort_is_sorted(int *ints, size_t n) {
+    size_t i;
+    for (i = 1; i < n; i++) {
+        CHECK(ints[i-1] <= ints[i]);
+    }
+}
+
+static int test_hsort_cmp(const void *i1, const void *i2, void *counter) {
+  *(size_t*)counter += 1;
+  return *(int*)i1 - *(int*)i2;
+}
+
+#define NUM 64
+void test_hsort(void) {
+    int ints[NUM] = { 0 };
+    size_t counter = 0;
+    int i, j;
+
+    secp256k1_hsort(ints, 0, sizeof(ints[0]), test_hsort_cmp, &counter);
+    CHECK(counter == 0);
+    secp256k1_hsort(ints, 1, sizeof(ints[0]), test_hsort_cmp, &counter);
+    CHECK(counter == 0);
+    secp256k1_hsort(ints, NUM, sizeof(ints[0]), test_hsort_cmp, &counter);
+    CHECK(counter > 0);
+    test_hsort_is_sorted(ints, NUM);
+
+    /* Test hsort with length n array and random elements in
+     * [-interval/2, interval/2] */
+    for (i = 0; i < count; i++) {
+        int n = secp256k1_testrand_int(NUM);
+        int interval = secp256k1_testrand_int(64);
+        for (j = 0; j < n; j++) {
+            ints[j] = secp256k1_testrand_int(interval) - interval/2;
+        }
+        secp256k1_hsort(ints, n, sizeof(ints[0]), test_hsort_cmp, &counter);
+        test_hsort_is_sorted(ints, n);
+    }
+}
+#undef NUM
+
+void test_xonly_sort_helper(secp256k1_xonly_pubkey *pk, size_t *pk_order, size_t n_pk) {
+    size_t i;
+    const secp256k1_xonly_pubkey *pk_test[5];
+
+    for (i = 0; i < n_pk; i++) {
+        pk_test[i] = &pk[pk_order[i]];
+    }
+    secp256k1_xonly_sort(ctx, pk_test, n_pk);
+    for (i = 0; i < n_pk; i++) {
+        CHECK(secp256k1_memcmp_var(pk_test[i], &pk[i], sizeof(*pk_test[i])) == 0);
+    }
+}
+
+void permute(size_t *arr, size_t n) {
+    size_t i;
+    for (i = n - 1; i >= 1; i--) {
+        size_t tmp, j;
+        j = secp256k1_testrand_int(i + 1);
+        tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+}
+
+void rand_xonly_pk(secp256k1_xonly_pubkey *pk) {
+    unsigned char seckey[32];
+    secp256k1_keypair keypair;
+    secp256k1_testrand256(seckey);
+    CHECK(secp256k1_keypair_create(ctx, &keypair, seckey) == 1);
+    CHECK(secp256k1_keypair_xonly_pub(ctx, pk, NULL, &keypair) == 1);
+}
+
+void test_xonly_sort_api(void) {
+    int ecount = 0;
+    secp256k1_xonly_pubkey pks[2];
+    const secp256k1_xonly_pubkey *pks_ptr[2];
+    secp256k1_context *none = api_test_context(SECP256K1_CONTEXT_NONE, &ecount);
+
+    pks_ptr[0] = &pks[0];
+    pks_ptr[1] = &pks[1];
+
+    rand_xonly_pk(&pks[0]);
+    rand_xonly_pk(&pks[1]);
+
+    CHECK(secp256k1_xonly_sort(none, pks_ptr, 2) == 1);
+    CHECK(secp256k1_xonly_sort(none, NULL, 2) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_xonly_sort(none, pks_ptr, 0) == 1);
+    /* Test illegal public keys */
+    memset(&pks[0], 0, sizeof(pks[0]));
+    CHECK(secp256k1_xonly_sort(none, pks_ptr, 2) == 1);
+    CHECK(ecount == 2);
+    memset(&pks[1], 0, sizeof(pks[1]));
+    CHECK(secp256k1_xonly_sort(none, pks_ptr, 2) == 1);
+    CHECK(ecount > 2);
+
+    secp256k1_context_destroy(none);
+}
+
+void test_xonly_sort(void) {
+    secp256k1_xonly_pubkey pk[5];
+    unsigned char pk_ser[5][32];
+    int i;
+    size_t pk_order[5] = { 0, 1, 2, 3, 4 };
+
+    for (i = 0; i < 5; i++) {
+        memset(pk_ser[i], 0, sizeof(pk_ser[i]));
+    }
+    pk_ser[0][0] = 5;
+    pk_ser[1][0] = 8;
+    pk_ser[2][0] = 0x0a;
+    pk_ser[3][0] = 0x0b;
+    pk_ser[4][0] = 0x0c;
+    for (i = 0; i < 5; i++) {
+        CHECK(secp256k1_xonly_pubkey_parse(ctx, &pk[i], pk_ser[i]));
+    }
+
+    permute(pk_order, 1);
+    test_xonly_sort_helper(pk, pk_order, 1);
+    permute(pk_order, 2);
+    test_xonly_sort_helper(pk, pk_order, 2);
+    permute(pk_order, 3);
+    test_xonly_sort_helper(pk, pk_order, 3);
+    for (i = 0; i < count; i++) {
+        permute(pk_order, 4);
+        test_xonly_sort_helper(pk, pk_order, 4);
+    }
+    for (i = 0; i < count; i++) {
+        permute(pk_order, 5);
+        test_xonly_sort_helper(pk, pk_order, 5);
+    }
+    /* Check that sorting also works for random pubkeys */
+    for (i = 0; i < count; i++) {
+        int j;
+        const secp256k1_xonly_pubkey *pk_ptr[5];
+        for (j = 0; j < 5; j++) {
+            rand_xonly_pk(&pk[j]);
+            pk_ptr[j] = &pk[j];
+        }
+        secp256k1_xonly_sort(ctx, pk_ptr, 5);
+        for (j = 1; j < 5; j++) {
+            CHECK(secp256k1_xonly_sort_cmp(&pk_ptr[j - 1], &pk_ptr[j], ctx) <= 0);
+        }
+    }
+}
+
 void run_extrakeys_tests(void) {
     /* xonly key test cases */
     test_xonly_pubkey();
     test_xonly_pubkey_tweak();
     test_xonly_pubkey_tweak_check();
     test_xonly_pubkey_tweak_recursive();
+    test_xonly_pubkey_comparison();
 
     /* keypair tests */
     test_keypair();
     test_keypair_add();
+
+    test_hsort();
+    test_xonly_sort_api();
+    test_xonly_sort();
 }
 
 #endif

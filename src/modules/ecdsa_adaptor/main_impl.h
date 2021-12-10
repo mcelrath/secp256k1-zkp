@@ -236,7 +236,6 @@ int secp256k1_ecdsa_adaptor_verify(const secp256k1_context* ctx, const unsigned 
     secp256k1_gej pubkeyj;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(adaptor_sig162 != NULL);
     ARG_CHECK(pubkey != NULL);
     ARG_CHECK(msg32 != NULL);
@@ -249,7 +248,7 @@ int secp256k1_ecdsa_adaptor_verify(const secp256k1_context* ctx, const unsigned 
         return 0;
     }
     /* DLEQ_verify((R', Y, R), dleq_proof) */
-    if(!secp256k1_dleq_verify(&ctx->ecmult_ctx, &dleq_proof_s, &dleq_proof_e, &rp, &enckey_ge, &r)) {
+    if(!secp256k1_dleq_verify(&dleq_proof_s, &dleq_proof_e, &rp, &enckey_ge, &r)) {
         return 0;
     }
     secp256k1_scalar_set_b32(&msg, msg32, NULL);
@@ -262,7 +261,7 @@ int secp256k1_ecdsa_adaptor_verify(const secp256k1_context* ctx, const unsigned 
     secp256k1_scalar_mul(&u1, &sn, &msg);
     secp256k1_scalar_mul(&u2, &sn, &sigr);
     secp256k1_gej_set_ge(&pubkeyj, &pubkey_ge);
-    secp256k1_ecmult(&ctx->ecmult_ctx, &derived_rp, &pubkeyj, &u2, &u1);
+    secp256k1_ecmult(&derived_rp, &pubkeyj, &u2, &u1);
     if (secp256k1_gej_is_infinity(&derived_rp)) {
         return 0;
     }
@@ -341,6 +340,17 @@ int secp256k1_ecdsa_adaptor_recover(const secp256k1_context* ctx, unsigned char 
      * branch point. */
     secp256k1_declassify(ctx, &enckey_expected_ge, sizeof(enckey_expected_ge));
     if (!secp256k1_eckey_pubkey_serialize(&enckey_expected_ge, enckey_expected33, &size, SECP256K1_EC_COMPRESSED)) {
+        /* Unreachable from tests (and other VERIFY builds) and therefore this
+         * branch should be ignored in test coverage analysis.
+         *
+         * Proof:
+         *     eckey_pubkey_serialize fails <=> deckey = 0
+         *     deckey = 0 <=> s^-1 = 0 or sp = 0
+         *     case 1: s^-1 = 0 impossible by the definition of multiplicative
+         *             inverse and because the scalar_inverse implementation
+         *             VERIFY_CHECKs that the inputs are valid scalars.
+         *     case 2: sp = 0 impossible because ecdsa_adaptor_sig_deserialize would have already failed
+         */
         return 0;
     }
     if (!secp256k1_ec_pubkey_serialize(ctx, enckey33, &size, enckey, SECP256K1_EC_COMPRESSED)) {
