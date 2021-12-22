@@ -138,6 +138,15 @@ example_musig_LDFLAGS = -static
 TESTS += example_musig
 endif
 
+if ENABLE_MODULE_FROST
+noinst_PROGRAMS += example_frost
+example_frost_SOURCES = examples/frost.c
+example_frost_CPPFLAGS = -I$(top_srcdir)/include
+example_frost_LDADD = libsecp256k1.la
+example_frost_LDFLAGS = -static
+TESTS += example_frost
+endif
+
 EXTRA_PROGRAMS = gen_ecmult_static_pre_g
 gen_ecmult_static_pre_g_SOURCES = src/gen_ecmult_static_pre_g.c
 # See Automake manual, Section "Errors with distclean"
