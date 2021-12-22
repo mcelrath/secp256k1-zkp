@@ -22,4 +22,10 @@ typedef struct {
 
 static int secp256k1_musig_session_load(const secp256k1_context* ctx, secp256k1_musig_session_internal *session_i, const secp256k1_musig_session *session);
 
+static int secp256k1_musig_secnonce_load(const secp256k1_context* ctx, secp256k1_scalar *k, secp256k1_musig_secnonce *secnonce);
+
+void secp256k1_musig_partial_sign_clear(secp256k1_scalar *sk, secp256k1_scalar *k);
+
+static void secp256k1_musig_partial_sig_save(secp256k1_musig_partial_sig* sig, secp256k1_scalar *s);
+
 #endif
