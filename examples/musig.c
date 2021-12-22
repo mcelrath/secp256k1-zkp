@@ -28,7 +28,7 @@ struct signer {
 
  /* Number of public keys involved in creating the aggregate signature */
 #define N_SIGNERS 3
- /* Create a key pair and store it in seckey and pubkey */
+/* Create a key pair, store it in signer_secrets->keypair and signer->pubkey */
 int create_keypair(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer) {
     unsigned char seckey[32];
     FILE *frand = fopen("/dev/urandom", "r");
@@ -89,7 +89,8 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         pubkeys[i] = &signer[i].pubkey;
         pubnonces[i] = &signer[i].pubnonce;
     }
-    /* Communication round 1: Exchange nonces */
+    /* Communication round 1: A production system would exchange public nonces
+     * here before moving on. */
     for (i = 0; i < N_SIGNERS; i++) {
         secp256k1_musig_aggnonce agg_pubnonce;
 
@@ -112,7 +113,8 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         }
         partial_sigs[i] = &signer[i].partial_sig;
     }
-    /* Communication round 2: Exchange partial signatures */
+    /* Communication round 2: A production system would exchange
+     * partial signatures here before moving on. */
     for (i = 0; i < N_SIGNERS; i++) {
         /* To check whether signing was successful, it suffices to either verify
          * the aggregate signature with the aggregate public key using

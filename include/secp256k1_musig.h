@@ -13,7 +13,7 @@ extern "C" {
  * (https://eprint.iacr.org/2020/1261, see Appendix B for the exact variant).
  * Signatures are compatible with BIP-340 ("Schnorr").
  * There's an example C source file in the module's directory
- * (src/modules/musig/example.c) that demonstrates how it can be used.
+ * (examples/musig.c) that demonstrates how it can be used.
  *
  * The module also supports BIP-341 ("Taproot") public key tweaking and adaptor
  * signatures as described in
@@ -24,7 +24,7 @@ extern "C" {
  *
  * You may know that the MuSig2 scheme uses two "nonces" instead of one. This
  * is not wrong, but only a technical detail we don't want to bother the user
- * with. Therefore, the API only uses to the singular term "nonce".
+ * with. Therefore, the API only uses the singular term "nonce".
  *
  * Since the first version of MuSig is essentially replaced by MuSig2, when
  * writing MuSig or musig here we mean MuSig2.
@@ -121,7 +121,7 @@ SECP256K1_API int secp256k1_musig_pubnonce_parse(
  *
  *  Returns: 1 when the nonce could be serialized, 0 otherwise
  *  Args:    ctx: a secp256k1 context object
- *  Out:   out32: pointer to a 66-byte array to store the serialized nonce
+ *  Out:   out66: pointer to a 66-byte array to store the serialized nonce
  *  In:    nonce: pointer to the nonce
  */
 SECP256K1_API int secp256k1_musig_pubnonce_serialize(
@@ -147,7 +147,7 @@ SECP256K1_API int secp256k1_musig_aggnonce_parse(
  *
  *  Returns: 1 when the nonce could be serialized, 0 otherwise
  *  Args:    ctx: a secp256k1 context object
- *  Out:   out32: pointer to a 66-byte array to store the serialized nonce
+ *  Out:   out66: pointer to a 66-byte array to store the serialized nonce
  *  In:    nonce: pointer to the nonce
  */
 SECP256K1_API int secp256k1_musig_aggnonce_serialize(
@@ -260,7 +260,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
     secp256k1_pubkey *output_pubkey,
     secp256k1_musig_keyagg_cache *keyagg_cache,
     const unsigned char *tweak32
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Starts a signing session by generating a nonce
  *
@@ -299,7 +299,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
  *              msg32: the 32-byte message that will later be signed, if already known
  *                     (can be NULL)
  *       keyagg_cache: pointer to the keyagg_cache that was used to create the aggregate
- *                     (and tweaked) public key if already known (can be NULL)
+ *                     (and potentially tweaked) public key if already known
+ *                     (can be NULL)
  *      extra_input32: an optional 32-byte array that is input to the nonce
  *                     derivation function (can be NULL)
  */
@@ -337,7 +338,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
     size_t n_pubnonces
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Takes the public nonces of all signers and computes a session cache that is
+/** Takes the public nonces of all signers and computes a session that is
  *  required for signing and verification of partial signatures.
  *
  *  If the adaptor argument is non-NULL, then the output of
@@ -353,7 +354,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *                      output of musig_nonce_agg
  *              msg32:  the 32-byte message to sign
  *       keyagg_cache:  pointer to the keyagg_cache that was used to create the
- *                      aggregate (and tweaked) pubkey
+ *                      aggregate (and potentially tweaked) pubkey
  *            adaptor:  optional pointer to an adaptor point encoded as a public
  *                      key if this signing session is part of an adaptor
  *                      signature protocol (can be NULL)
@@ -433,7 +434,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
  *  In:       session: pointer to the session that was created with
  *                     musig_nonce_process
  *       partial_sigs: array of pointers to partial signatures to aggregate
- *             n_sigs: number of elements in the partial_sigs array
+ *             n_sigs: number of elements in the partial_sigs array. Must be
+ *                     greater than 0.
  */
 SECP256K1_API int secp256k1_musig_partial_sig_agg(
     const secp256k1_context* ctx,
@@ -461,26 +463,29 @@ SECP256K1_API int secp256k1_musig_nonce_parity(
     const secp256k1_musig_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Converts a pre-signature that misses the adaptor into a full signature
+/** Creates a signature from a pre-signature and an adaptor.
  *
- *  If the sec_adaptor32 argument is incorrect, the adapted signature will be
- *  invalid. This function does not verify the adapted signature.
+ *  If the sec_adaptor32 argument is incorrect, the output signature will be
+ *  invalid. This function does not verify the signature.
  *
- *  Returns: 0 if the arguments are invalid, or sig64 or sec_adaptor32 contain
+ *  Returns: 0 if the arguments are invalid, or pre_sig64 or sec_adaptor32 contain
  *           invalid (overflowing) values. 1 otherwise (which does NOT mean the
  *           signature or the adaptor are valid!)
  *  Args:         ctx: pointer to a context object
- *  In/Out:     sig64: 64-byte pre-signature that is adapted to a complete signature
- *  In: sec_adaptor32: 32-byte secret adaptor to add to the partial signature
+ *  Out:        sig64: 64-byte signature. This pointer may point to the same
+ *                     memory area as `pre_sig`.
+ *  In:     pre_sig64: 64-byte pre-signature
+ *      sec_adaptor32: 32-byte secret adaptor to add to the pre-signature
  *       nonce_parity: the output of `musig_nonce_parity` called with the
- *                     session used for producing sig64
+ *                     session used for producing the pre-signature
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_adapt(
     const secp256k1_context* ctx,
     unsigned char *sig64,
+    const unsigned char *pre_sig64,
     const unsigned char *sec_adaptor32,
     int nonce_parity
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Extracts a secret adaptor from a MuSig pre-signature and corresponding
  *  signature
