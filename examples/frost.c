@@ -23,7 +23,6 @@ struct signer_secrets {
 };
 
 struct signer {
-    /* secp256k1_pubkey pubkey; */
     secp256k1_xonly_pubkey pubkey;
     secp256k1_musig_pubnonce pubnonce;
     secp256k1_musig_partial_sig partial_sig;
@@ -183,6 +182,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         printf("FAILED\n");
         return 1;
     }
+    printf("ok\n");
     printf("Creating shares......");
     if (!create_shares(ctx, signer_secrets, &cache)) {
         printf("FAILED\n");
