@@ -13,34 +13,7 @@
 #include "../musig/session.h"
 #include "hash.h"
 
-static int secp256k1_frost_generate_shares(secp256k1_frost_share *shares, const secp256k1_scalar *secret, const unsigned char *rngseed, const size_t n_participants, const size_t threshold) {
-    size_t i;
-
-    for (i = 0; i < n_participants; i++) {
-        size_t j;
-        secp256k1_scalar share_i;
-        secp256k1_scalar scalar_i;
-        secp256k1_scalar rand[2];
-
-        secp256k1_scalar_clear(&share_i);
-        secp256k1_scalar_set_int(&scalar_i, i + 1);
-        for (j = 0; j < threshold - 1; j++) {
-            if (j % 2 == 0) {
-                secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, j);
-            }
-
-            /* Horner's method to evaluate polynomial to derive shares */
-            secp256k1_scalar_add(&share_i, &share_i, &rand[j % 2]);
-            secp256k1_scalar_mul(&share_i, &share_i, &scalar_i);
-        }
-        secp256k1_scalar_add(&share_i, &share_i, secret);
-        secp256k1_scalar_get_b32(shares[i].data, &share_i);
-    }
-
-    return 1;
-}
-
-static int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, const size_t threshold, const size_t n_participants, const unsigned char *seckey32) {
+static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, const size_t threshold, const size_t n_participants, const unsigned char *seckey32) {
     secp256k1_sha256 sha;
     size_t i;
     int overflow;
@@ -89,8 +62,25 @@ static int secp256k1_frost_keygen_init(const secp256k1_context *ctx, secp256k1_p
         secp256k1_pubkey_save(&pubcoeff[i + 1], &rp);
     }
 
-    if (!secp256k1_frost_generate_shares(shares, &const_term, rngseed, n_participants, threshold)) {
-        return 0;
+    for (i = 0; i < n_participants; i++) {
+        size_t j;
+        secp256k1_scalar share_i;
+        secp256k1_scalar scalar_i;
+        secp256k1_scalar rand[2];
+
+        secp256k1_scalar_clear(&share_i);
+        secp256k1_scalar_set_int(&scalar_i, i + 1);
+        for (j = 0; j < threshold - 1; j++) {
+            if (j % 2 == 0) {
+                secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, j);
+            }
+
+            /* Horner's method to evaluate polynomial to derive shares */
+            secp256k1_scalar_add(&share_i, &share_i, &rand[j % 2]);
+            secp256k1_scalar_mul(&share_i, &share_i, &scalar_i);
+        }
+        secp256k1_scalar_add(&share_i, &share_i,   &const_term);
+        secp256k1_scalar_get_b32(shares[i].data, &share_i);
     }
 
     return 1;
@@ -123,18 +113,12 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pu
     secp256k1_scalar_mul(&sk, &sk, &mu);
     secp256k1_scalar_get_b32(buf, &sk);
 
-    if (!secp256k1_frost_keygen_init(ctx, pubcoeff, shares, threshold, n_participants, buf)) {
+    if (!secp256k1_frost_share_gen_internal(ctx, pubcoeff, shares, threshold, n_participants, buf)) {
         return 0;
     }
 
     return 1;
 }
-
-typedef struct {
-    const secp256k1_context *ctx;
-    const secp256k1_pubkey *pks;
-    size_t threshold;
-} secp256k1_frost_pubkey_combine_ecmult_data;
 
 int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, const secp256k1_frost_share * const* shares, size_t n_shares) {
     secp256k1_scalar acc;
