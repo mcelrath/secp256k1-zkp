@@ -149,7 +149,7 @@ static int secp256k1_frost_compute_vss_hash(const secp256k1_context *ctx, unsign
             if (!secp256k1_ec_pubkey_serialize(ctx, ser, &size, &pk[i][j], SECP256K1_EC_COMPRESSED)) {
                 return 0;
             }
-            secp256k1_sha256_write(&sha, ser, 32);
+            secp256k1_sha256_write(&sha, ser, 33);
         }
     }
     secp256k1_sha256_finalize(&sha, vss_hash);
