@@ -120,7 +120,44 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pu
     return 1;
 }
 
-int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, const secp256k1_frost_share * const* shares, size_t n_shares) {
+/* Initializes SHA256 with fixed midstate. This midstate was computed by applying
+ * SHA256 to SHA256("VSS list")||SHA256("VSS list"). */
+static void secp256k1_frost_vsslist_sha256(secp256k1_sha256 *sha) {
+    secp256k1_sha256_initialize(sha);
+
+    sha->s[0] = 0x3c261fccul;
+    sha->s[1] = 0xeeec1555ul;
+    sha->s[2] = 0x6bb6cfc8ul;
+    sha->s[3] = 0x678ade57ul;
+    sha->s[4] = 0xfb4b11f9ul;
+    sha->s[5] = 0x9627b131ul;
+    sha->s[6] = 0xbf978156ul;
+    sha->s[7] = 0xfc1263cdul;
+    sha->bytes = 64;
+}
+
+/* Computes vss_hash = tagged_hash(pk[0], ..., pk[np-1]) */
+static int secp256k1_frost_compute_vss_hash(const secp256k1_context *ctx, unsigned char *vss_hash, const secp256k1_pubkey * const* pk, size_t np, size_t t) {
+    secp256k1_sha256 sha;
+    size_t i, j;
+    size_t size = 33;
+
+    secp256k1_frost_vsslist_sha256(&sha);
+    for (i = 0; i < np; i++) {
+        for (j = 0; j < t; j++) {
+            unsigned char ser[33];
+            if (!secp256k1_ec_pubkey_serialize(ctx, ser, &size, &pk[i][j], SECP256K1_EC_COMPRESSED)) {
+                return 0;
+            }
+            secp256k1_sha256_write(&sha, ser, 32);
+        }
+    }
+    secp256k1_sha256_finalize(&sha, vss_hash);
+
+    return 1;
+}
+
+int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* pubcoeffs, size_t n_shares, size_t threshold) {
     secp256k1_scalar acc;
     size_t i;
 
@@ -133,11 +170,16 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     for (i = 0; i < n_shares; i++) {
         secp256k1_scalar share_i;
 
+        /* TODO: verify share */
         secp256k1_scalar_set_b32(&share_i, shares[i]->data, NULL);
         secp256k1_scalar_add(&acc, &acc, &share_i);
     }
 
     secp256k1_scalar_get_b32((unsigned char *) agg_share->data, &acc);
+
+    if (!secp256k1_frost_compute_vss_hash(ctx, vss_hash, pubcoeffs, n_shares, threshold)) {
+        return 0;
+    }
 
     return 1;
 }

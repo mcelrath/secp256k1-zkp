@@ -44,9 +44,12 @@ SECP256K1_API int secp256k1_frost_share_gen(
 SECP256K1_API int secp256k1_frost_share_agg(
     const secp256k1_context* ctx,
     secp256k1_frost_share *agg_share,
+    unsigned char *vss_hash,
     const secp256k1_frost_share * const* shares,
-    size_t n_shares
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+    const secp256k1_pubkey * const* pubcoeffs,
+    size_t n_shares,
+    size_t threshold
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
 
 SECP256K1_API int secp256k1_frost_partial_sign(
