@@ -86,7 +86,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
     return 1;
 }
 
-int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, const size_t threshold, const size_t n_participants, const secp256k1_keypair *keypair, const secp256k1_musig_keyagg_cache *keyagg_cache) {
+int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, size_t threshold, size_t n_participants, const secp256k1_keypair *keypair, const secp256k1_musig_keyagg_cache *keyagg_cache) {
     secp256k1_scalar sk;
     secp256k1_ge pk;
     secp256k1_scalar mu;
@@ -168,7 +168,7 @@ static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size
     secp256k1_scalar_mul(r, &num, &den);
 }
 
-int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_musig_partial_sig *partial_sig, secp256k1_musig_secnonce *secnonce, const secp256k1_frost_share *agg_share, const secp256k1_musig_session *session, const size_t n_signers, const size_t *indexes, const size_t my_index) {
+int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_musig_partial_sig *partial_sig, secp256k1_musig_secnonce *secnonce, const secp256k1_frost_share *agg_share, const secp256k1_musig_session *session, size_t n_signers, size_t *indexes, size_t my_index) {
     secp256k1_scalar sk, l;
     secp256k1_scalar k[2];
     secp256k1_scalar s;

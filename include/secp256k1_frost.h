@@ -35,8 +35,8 @@ SECP256K1_API int secp256k1_frost_share_gen(
     const secp256k1_context *ctx,
     secp256k1_pubkey *pubcoeff,
     secp256k1_frost_share *shares,
-    const size_t threshold,
-    const size_t n_participants,
+    size_t threshold,
+    size_t n_participants,
     const secp256k1_keypair *keypair,
     const secp256k1_musig_keyagg_cache *keyagg_cache
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7);
@@ -55,9 +55,9 @@ SECP256K1_API int secp256k1_frost_partial_sign(
     secp256k1_musig_secnonce *secnonce,
     const secp256k1_frost_share *agg_share,
     const secp256k1_musig_session *session,
-    const size_t n_signers,
-    const size_t *indexes,
-    const size_t my_index
+    size_t n_signers,
+    size_t *indexes,
+    size_t my_index
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(7);
 
 /* TODO: serialization APIs that facilitate communication rounds */
