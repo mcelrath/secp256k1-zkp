@@ -13,7 +13,7 @@
 #include "../musig/session.h"
 #include "hash.h"
 
-static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, const size_t threshold, const size_t n_participants, const unsigned char *seckey32) {
+static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, size_t threshold, size_t n_participants, const unsigned char *seckey32) {
     secp256k1_sha256 sha;
     size_t i;
     int overflow;
@@ -184,7 +184,7 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     return 1;
 }
 
-static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const size_t *participant_indexes, const size_t n_participants, const size_t my_index) {
+static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, size_t *participant_indexes, size_t n_participants, size_t my_index) {
     size_t i;
     secp256k1_scalar num;
     secp256k1_scalar den;
