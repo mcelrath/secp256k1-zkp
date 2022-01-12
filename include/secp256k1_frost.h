@@ -48,7 +48,8 @@ SECP256K1_API int secp256k1_frost_share_agg(
     const secp256k1_frost_share * const* shares,
     const secp256k1_pubkey * const* pubcoeffs,
     size_t n_shares,
-    size_t threshold
+    size_t threshold,
+    size_t my_index
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
 

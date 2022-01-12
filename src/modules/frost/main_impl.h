@@ -59,7 +59,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
         /* Compute commitment to each coefficient */
         secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &rand[i % 2]);
         secp256k1_ge_set_gej(&rp, &rj);
-        secp256k1_pubkey_save(&pubcoeff[i + 1], &rp);
+        secp256k1_pubkey_save(&pubcoeff[threshold - i - 1], &rp);
     }
 
     for (i = 0; i < n_participants; i++) {
@@ -79,7 +79,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
             secp256k1_scalar_add(&share_i, &share_i, &rand[j % 2]);
             secp256k1_scalar_mul(&share_i, &share_i, &scalar_i);
         }
-        secp256k1_scalar_add(&share_i, &share_i,   &const_term);
+        secp256k1_scalar_add(&share_i, &share_i, &const_term);
         secp256k1_scalar_get_b32(shares[i].data, &share_i);
     }
 
@@ -157,7 +157,26 @@ static int secp256k1_frost_compute_vss_hash(const secp256k1_context *ctx, unsign
     return 1;
 }
 
-int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* pubcoeffs, size_t n_shares, size_t threshold) {
+typedef struct {
+    const secp256k1_context *ctx;
+    secp256k1_scalar idx;
+    secp256k1_scalar idxn;
+    const secp256k1_pubkey * const* pubcoeff;
+} secp256k1_musig_verify_share_ecmult_data;
+
+static int secp256k1_frost_verify_share_ecmult_callback(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void *data) {
+    secp256k1_musig_verify_share_ecmult_data *ctx = (secp256k1_musig_verify_share_ecmult_data *) data;
+    int ret;
+
+    ret = secp256k1_pubkey_load(ctx->ctx, pt, *(ctx->pubcoeff)+idx);
+    VERIFY_CHECK(ret);
+    secp256k1_scalar_mul(sc, &secp256k1_scalar_one, &ctx->idxn);
+    secp256k1_scalar_mul(&ctx->idxn, &ctx->idxn, &ctx->idx);
+
+    return 1;
+}
+
+int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* pubcoeffs, size_t n_shares, size_t threshold, size_t my_index) {
     secp256k1_scalar acc;
     size_t i;
 
@@ -169,12 +188,33 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     secp256k1_scalar_clear(&acc);
     for (i = 0; i < n_shares; i++) {
         secp256k1_scalar share_i;
+        secp256k1_musig_verify_share_ecmult_data ecmult_data;
+        secp256k1_gej sharej;
+        secp256k1_gej expectedj;
 
-        /* TODO: verify share */
         secp256k1_scalar_set_b32(&share_i, shares[i]->data, NULL);
+
+        /* Verify Share */
+        ecmult_data.ctx = ctx;
+        ecmult_data.pubcoeff = &pubcoeffs[i];
+
+        /* ...compute the participant's public share by evaluating the public polynomial at their index */
+        secp256k1_scalar_set_int(&ecmult_data.idx, my_index);
+        secp256k1_scalar_set_int(&ecmult_data.idxn, 1);
+
+        /* TODO: add scratch */
+        if (!secp256k1_ecmult_multi_var(&ctx->error_callback, NULL, &sharej, NULL, secp256k1_frost_verify_share_ecmult_callback, (void *) &ecmult_data, threshold)) {
+            return 0;
+        }
+        secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &expectedj, &share_i);
+        secp256k1_gej_neg(&expectedj, &expectedj);
+        secp256k1_gej_add_var(&expectedj, &expectedj, &sharej, NULL);
+        if (!secp256k1_gej_is_infinity(&expectedj)) {
+            return 0;
+        }
+
         secp256k1_scalar_add(&acc, &acc, &share_i);
     }
-
     secp256k1_scalar_get_b32((unsigned char *) agg_share->data, &acc);
 
     if (!secp256k1_frost_compute_vss_hash(ctx, vss_hash, pubcoeffs, n_shares, threshold)) {

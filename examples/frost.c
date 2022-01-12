@@ -107,7 +107,7 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
         for (j = 0; j < N_SIGNERS; j++) {
             assigned_shares[j] = &shares[j][i];
         }
-        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, signer[i].vss_hash, assigned_shares, pubcoeffs, N_SIGNERS, THRESHOLD)) {
+        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, signer[i].vss_hash, assigned_shares, pubcoeffs, N_SIGNERS, THRESHOLD, i+1)) {
             return 0;
         }
     }
