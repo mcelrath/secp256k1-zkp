@@ -31,7 +31,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
     }
 
     /* Compute seed which commits to all inputs */
-    /* TODO: allow user suplied function that takes seckey, threshold, and n_participants as inputs and supplies the rngseed */
+    /* TODO: commit to agg_pk */
     secp256k1_sha256_initialize(&sha);
     secp256k1_sha256_write(&sha, seckey32, 32);
     for (i = 0; i < 8; i++) {

@@ -1,12 +1,12 @@
 /***********************************************************************
- * Copyright (c) 2021 Jesse Posner, Jonas Nick                         *
+ * Copyright (c) 2021, 2022 Jesse Posner, Jonas Nick                   *
  * Distributed under the MIT software license, see the accompanying    *
  * file COPYING or https://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
 /**
- * This file demonstrates how to use the FROST module to create a threshold signature.
- * Additionally, see the documentation in include/secp256k1_frost.h.
+ * This file demonstrates how to use the FROST module to create a threshold
+ * signature. Additionally, see the documentation in include/secp256k1_frost.h.
  */
 
 #include <stdio.h>
@@ -61,17 +61,21 @@ int create_keypair(const secp256k1_context* ctx, struct signer_secrets *signer_s
 }
 
  /* Create shares and coefficient commitments */
-int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, const secp256k1_musig_keyagg_cache *keyagg_cache) {
+int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer) {
     int i;
     secp256k1_frost_share shares[N_SIGNERS][N_SIGNERS];
     const secp256k1_pubkey *pubcoeffs[N_SIGNERS];
+    const secp256k1_xonly_pubkey *pubkeys[N_SIGNERS];
+    /* The same for all signers */
+    secp256k1_musig_keyagg_cache cache;
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
         unsigned char seckey[32];
         unsigned char session_id[32];
-
-        /* Create random session ID. */
+        /* Create random session ID. It is absolutely necessary that the session ID
+         * is unique for every call of secp256k1_musig_nonce_gen. Otherwise
+         * it's trivial for an attacker to extract the secret key! */
         frand = fopen("/dev/urandom", "r");
         if(frand == NULL) {
             return 0;
@@ -84,29 +88,37 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
         if (!secp256k1_keypair_sec(ctx, seckey, &signer_secrets[i].keypair)) {
             return 0;
         }
-        /* Initialize session and create secret nonce for VSS signing and public
+        /* Initialize session and create secret nonce for signing and public
          * nonce to send to the other signers. */
-        /* TODO: create nonce helper function */
         if (!secp256k1_musig_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, seckey, NULL, NULL, NULL)) {
             return 0;
         }
+        pubkeys[i] = &signer[i].pubkey;
+        pubcoeffs[i] = signer[i].pubcoeff;
+    }
 
-        if (!secp256k1_frost_share_gen(ctx, signer[i].pubcoeff, shares[i], THRESHOLD, N_SIGNERS, &signer_secrets[i].keypair, keyagg_cache)) {
+    for (i = 0; i < N_SIGNERS; i++) {
+        if (!secp256k1_musig_pubkey_agg(ctx, NULL, NULL, &cache, pubkeys, N_SIGNERS)) {
+            return 0;
+        }
+        /* Generate a polynomial share for each participant */
+        if (!secp256k1_frost_share_gen(ctx, signer[i].pubcoeff, shares[i], THRESHOLD, N_SIGNERS, &signer_secrets[i].keypair, &cache)) {
             return 0;
         }
     }
 
-    /* Communication round 1: exchange shares, nonce commitments, and coefficient commitments */
-    for (i = 0; i < N_SIGNERS; i++) {
-        pubcoeffs[i] = signer[i].pubcoeff;
-    }
+    /* KeyGen communication round 1: exchange shares, nonce commitments, and
+     * coefficient commitments */
     for (i = 0; i < N_SIGNERS; i++) {
         int j;
         const secp256k1_frost_share *assigned_shares[N_SIGNERS];
 
+        /* Each participant receives a share from each participant (including
+         * themselves) corresponding to their index. */
         for (j = 0; j < N_SIGNERS; j++) {
             assigned_shares[j] = &shares[j][i];
         }
+        /* Each participant aggregates the shares they received. */
         if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, signer[i].vss_hash, assigned_shares, pubcoeffs, N_SIGNERS, THRESHOLD, i+1)) {
             return 0;
         }
@@ -142,28 +154,14 @@ int sign_vss(const secp256k1_context* ctx, struct signer_secrets *signer_secrets
         if (!secp256k1_musig_nonce_process(ctx, &session, &agg_pubnonce, signer[i].vss_hash, &cache, NULL)) {
             return 0;
         }
-        /* partial_sign will clear the secnonce by setting it to 0. That's because */
-        /* you must _never_ reuse the secnonce (or use the same session_id to */
-        /* create a secnonce). If you do, you effectively reuse the nonce and */
-        /* leak the secret key.  */
         if (!secp256k1_musig_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].keypair, &cache, &session)) {
             return 0;
         }
         partial_sigs[i] = &signer[i].partial_sig;
     }
-    /* Communication round 2: A production system would exchange */
-    /* partial signatures here before moving on.  */
+    /* KeyGen communication round 2: exchange partial signatures of a list of
+     * all VSS commitments received by each participant */
     for (i = 0; i < N_SIGNERS; i++) {
-        /* To check whether signing was successful, it suffices to either verify */
-        /* the aggregate signature with the aggregate public key using */
-        /* secp256k1_schnorrsig_verify, or verify all partial signatures of all */
-        /* signers individually. Verifying the aggregate signature is cheaper but */
-        /* verifying the individual partial signatures has the advantage that it */
-        /* can be used to determine which of the partial signatures are invalid */
-        /* (if any), i.e., which of the partial signatures cause the aggregate */
-        /* signature to be invalid and thus the protocol run to fail. It's also */
-        /* fine to first verify the aggregate sig, and only verify the individual */
-        /* sigs if it does not work. */
         if (!secp256k1_musig_partial_sig_verify(ctx, &signer[i].partial_sig, &signer[i].pubnonce, &signer[i].pubkey, &cache, &session)) {
             return 0;
         }
@@ -171,7 +169,8 @@ int sign_vss(const secp256k1_context* ctx, struct signer_secrets *signer_secrets
     return secp256k1_musig_partial_sig_agg(ctx, sig64, &session, partial_sigs, N_SIGNERS);
 }
 
-/* Sign a message hash with the given key pairs and store the result in sig */
+/* Sign a message hash with the given threshold and aggregate shares and store
+ * the result in sig */
 int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, const unsigned char* msg32, unsigned char *sig64) {
     int i;
     const secp256k1_xonly_pubkey *pubkeys[N_SIGNERS];
@@ -210,18 +209,19 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         pubnonces[i] = &signer[i].pubnonce;
     }
 
+    /* Set indexes of participants who will be signing */
     for (i = 0; i < THRESHOLD; i++) {
         participants[i] = i+1;
     }
-    if (!secp256k1_musig_pubkey_agg(ctx, NULL, NULL, &cache, pubkeys, N_SIGNERS)) {
-        return 0;
-    }
 
-    /* Communication round 1: Exchange nonces */
+    /* Signing communication round 1: Exchange nonces */
     for (i = 0; i < THRESHOLD; i++) {
         secp256k1_musig_aggnonce agg_pubnonce;
 
-        /* Aggregate nonce and initialize signer data */
+        /* Create aggregate pubkey, aggregate nonce and initialize signer data */
+        if (!secp256k1_musig_pubkey_agg(ctx, NULL, NULL, &cache, pubkeys, N_SIGNERS)) {
+            return 0;
+        }
         if (!secp256k1_musig_nonce_agg(ctx, &agg_pubnonce, pubnonces, THRESHOLD)) {
             return 0;
         }
@@ -237,7 +237,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         }
         partial_sigs[i] = &signer[i].partial_sig;
     }
-    /* Communication round 2: Exchange partial signatures */
+    /* Signing communication round 2: Exchange partial signatures */
     return secp256k1_musig_partial_sig_agg(ctx, sig64, &session, partial_sigs, THRESHOLD);
 }
 
@@ -247,7 +247,6 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
     struct signer_secrets signer_secrets[N_SIGNERS];
     struct signer signers[N_SIGNERS];
     const secp256k1_xonly_pubkey *pubkeys_ptr[N_SIGNERS];
-    secp256k1_musig_keyagg_cache cache;
     secp256k1_xonly_pubkey agg_pk;
     unsigned char msg[32] = "this_could_be_the_hash_of_a_msg!";
     unsigned char sig[64];
@@ -264,13 +263,13 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
     }
     printf("ok\n");
     printf("Combining public keys...");
-    if (!secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &cache, pubkeys_ptr, N_SIGNERS)) {
+    if (!secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, NULL, pubkeys_ptr, N_SIGNERS)) {
         printf("FAILED\n");
         return 1;
     }
     printf("ok\n");
     printf("Creating shares......");
-    if (!create_shares(ctx, signer_secrets, signers, &cache)) {
+    if (!create_shares(ctx, signer_secrets, signers)) {
         printf("FAILED\n");
         return 1;
     }
