@@ -22,13 +22,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
     secp256k1_ge rp;
     unsigned char rngseed[32];
 
-    VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     ARG_CHECK(seckey32 != NULL);
-
-    if (threshold == 0 || threshold > n_participants) {
-        return 0;
-    }
 
     /* Compute seed which commits to all inputs */
     /* TODO: commit to agg_pk */
@@ -92,6 +86,18 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pu
     secp256k1_scalar mu;
     secp256k1_keyagg_cache_internal cache_i;
     unsigned char buf[32];
+
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    ARG_CHECK(pubcoeff != NULL);
+    ARG_CHECK(shares != NULL);
+    ARG_CHECK(n_participants > 0);
+    ARG_CHECK(keypair != NULL);
+    ARG_CHECK(keyagg_cache != NULL);
+
+    if (threshold == 0 || threshold > n_participants) {
+        return 0;
+    }
 
     if (!secp256k1_keypair_load(ctx, &sk, &pk, keypair)) {
         return 0;
@@ -182,8 +188,15 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(agg_share != NULL);
+    ARG_CHECK(vss_hash != NULL);
     ARG_CHECK(shares != NULL);
+    ARG_CHECK(pubcoeffs != NULL);
     ARG_CHECK(n_shares > 0);
+    ARG_CHECK(my_index > 0);
+
+    if (threshold == 0 || threshold > n_shares) {
+        return 0;
+    }
 
     secp256k1_scalar_clear(&acc);
     for (i = 0; i < n_shares; i++) {
