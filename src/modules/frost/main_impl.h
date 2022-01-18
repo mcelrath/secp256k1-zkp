@@ -187,6 +187,7 @@ static int secp256k1_frost_verify_share_ecmult_callback(secp256k1_scalar *sc, se
 int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* pubcoeffs, size_t n_shares, size_t threshold, size_t my_index) {
     secp256k1_scalar acc;
     size_t i;
+    int overflow;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(agg_share != NULL);
@@ -207,7 +208,10 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
         secp256k1_gej sharej;
         secp256k1_gej expectedj;
 
-        secp256k1_scalar_set_b32(&share_i, shares[i]->data, NULL);
+        secp256k1_scalar_set_b32(&share_i, shares[i]->data, &overflow);
+        if (overflow) {
+            return 0;
+        }
 
         ecmult_data.ctx = ctx;
         ecmult_data.pubcoeff = &pubcoeffs[i];
@@ -269,6 +273,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     secp256k1_scalar s;
     secp256k1_musig_session_internal session_i;
     int ret;
+    int overflow;
 
     VERIFY_CHECK(ctx != NULL);
 
@@ -287,7 +292,10 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     ARG_CHECK(agg_share != NULL);
     ARG_CHECK(session != NULL);
 
-    secp256k1_scalar_set_b32(&sk, agg_share->data, NULL);
+    secp256k1_scalar_set_b32(&sk, agg_share->data, &overflow);
+    if (overflow) {
+        return 0;
+    }
     if (!secp256k1_musig_session_load(ctx, &session_i, session)) {
         secp256k1_musig_partial_sign_clear(&sk, k);
         return 0;
