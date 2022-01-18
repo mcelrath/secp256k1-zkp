@@ -13,8 +13,8 @@ extern "C" {
 /** This code is currently a work in progress. It's not secure nor stable.  IT
  * IS EXTREMELY DANGEROUS AND RECKLESS TO USE THIS MODULE IN PRODUCTION!
 
- * This module implements Flexible Round-Optimized Schnorr Threshold Signatures
- * (FROST) by Chelsea Komlo and Ian Goldberg
+ * This module implements a modified version of Flexible Round-Optimized
+ * Schnorr Threshold Signatures (FROST) by Chelsea Komlo and Ian Goldberg
  * (https://crysp.uwaterloo.ca/software/frost/).
  */
 
@@ -64,7 +64,7 @@ SECP256K1_API int secp256k1_frost_partial_sign(
     size_t my_index
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(7);
 
-/* TODO: serialization APIs that facilitate communication rounds */
+/* TODO: serialization APIs */
 
 #ifdef __cplusplus
 }

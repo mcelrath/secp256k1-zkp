@@ -13,6 +13,8 @@
 #include "../musig/session.h"
 #include "hash.h"
 
+/* Generate polynomial coefficients, coefficient commitments, and shares, from
+ * a seed and a secret key. */
 static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, size_t threshold, size_t n_participants, const unsigned char *seckey32) {
     secp256k1_sha256 sha;
     size_t i;
@@ -43,7 +45,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
     secp256k1_ge_set_gej(&rp, &rj);
     secp256k1_pubkey_save(&pubcoeff[0], &rp);
 
-    /* Derive coefficients from the seed. */
+    /* Derive coefficients from the seed */
     for (i = 0; i < threshold - 1; i++) {
         secp256k1_scalar rand[2];
 
@@ -207,18 +209,16 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
 
         secp256k1_scalar_set_b32(&share_i, shares[i]->data, NULL);
 
-        /* Verify Share */
         ecmult_data.ctx = ctx;
         ecmult_data.pubcoeff = &pubcoeffs[i];
-
-        /* ...compute the participant's public share by evaluating the public polynomial at their index */
+        /* Evaluate the public polynomial at the index */
         secp256k1_scalar_set_int(&ecmult_data.idx, my_index);
         secp256k1_scalar_set_int(&ecmult_data.idxn, 1);
-
         /* TODO: add scratch */
         if (!secp256k1_ecmult_multi_var(&ctx->error_callback, NULL, &sharej, NULL, secp256k1_frost_verify_share_ecmult_callback, (void *) &ecmult_data, threshold)) {
             return 0;
         }
+        /* Verify share using VSS */
         secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &expectedj, &share_i);
         secp256k1_gej_neg(&expectedj, &expectedj);
         secp256k1_gej_add_var(&expectedj, &expectedj, &sharej, NULL);
