@@ -15,7 +15,7 @@
 
 /* Generate polynomial coefficients, coefficient commitments, and shares, from
  * a seed and a secret key. */
-static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, size_t threshold, size_t n_participants, const unsigned char *seckey32) {
+static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, size_t threshold, size_t n_participants, const unsigned char *seckey32, const unsigned char *pk_hash) {
     secp256k1_sha256 sha;
     size_t i;
     int overflow;
@@ -27,8 +27,8 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
     ARG_CHECK(seckey32 != NULL);
 
     /* Compute seed which commits to all inputs */
-    /* TODO: commit to agg_pk */
     secp256k1_sha256_initialize(&sha);
+    secp256k1_sha256_write(&sha, pk_hash, 32);
     secp256k1_sha256_write(&sha, seckey32, 32);
     for (i = 0; i < 8; i++) {
         rngseed[i + 0] = threshold / (1ull << (i * 8));
@@ -121,7 +121,7 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pu
     secp256k1_scalar_mul(&sk, &sk, &mu);
     secp256k1_scalar_get_b32(buf, &sk);
 
-    if (!secp256k1_frost_share_gen_internal(ctx, pubcoeff, shares, threshold, n_participants, buf)) {
+    if (!secp256k1_frost_share_gen_internal(ctx, pubcoeff, shares, threshold, n_participants, buf, cache_i.pk_hash)) {
         return 0;
     }
 
