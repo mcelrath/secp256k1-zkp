@@ -2,13 +2,13 @@
 #define SECP256K1_FROST_H
 
 #include "secp256k1_extrakeys.h"
-#include "secp256k1_musig.h"
+#include "../src/scalar.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
+#include <stddef.h>
 
 /** This code is currently a work in progress. It's not secure nor stable.  IT
  * IS EXTREMELY DANGEROUS AND RECKLESS TO USE THIS MODULE IN PRODUCTION!
@@ -31,40 +31,117 @@ typedef struct {
     unsigned char data[32];
 } secp256k1_frost_share;
 
+typedef struct {
+    unsigned char data[68];
+} secp256k1_frost_secnonce;
+
+typedef struct {
+    unsigned char data[132];
+} secp256k1_frost_pubnonce;
+
+typedef struct {
+    unsigned char data[132];
+} secp256k1_frost_aggnonce;
+
+typedef struct {
+    int fin_nonce_parity;
+    unsigned char fin_nonce[32];
+    secp256k1_scalar noncecoef;
+    secp256k1_scalar challenge;
+    secp256k1_scalar s_part;
+} secp256k1_frost_session_internal;
+
+typedef struct {
+    unsigned char data[133];
+} secp256k1_frost_session;
+
+typedef struct {
+    unsigned char data[36];
+} secp256k1_frost_partial_sig;
+
+/* TODO: sanity check argument order */
+
 SECP256K1_API int secp256k1_frost_share_gen(
     const secp256k1_context *ctx,
     secp256k1_pubkey *pubcoeff,
     secp256k1_frost_share *shares,
     size_t threshold,
     size_t n_participants,
-    const secp256k1_keypair *keypair,
-    const secp256k1_musig_keyagg_cache *keyagg_cache
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7);
+    const secp256k1_keypair *keypair
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(6);
 
 SECP256K1_API int secp256k1_frost_share_agg(
     const secp256k1_context* ctx,
     secp256k1_frost_share *agg_share,
+    secp256k1_xonly_pubkey *agg_pk,
     unsigned char *vss_hash,
     const secp256k1_frost_share * const* shares,
     const secp256k1_pubkey * const* pubcoeffs,
     size_t n_shares,
     size_t threshold,
     size_t my_index
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
+SECP256K1_API int secp256k1_frost_nonce_gen(
+    const secp256k1_context* ctx,
+    secp256k1_frost_secnonce *secnonce,
+    secp256k1_frost_pubnonce *pubnonce,
+    const unsigned char *session_id32,
+    const secp256k1_frost_share *agg_share,
+    const unsigned char *msg32,
+    const secp256k1_xonly_pubkey *agg_pk,
+    const unsigned char *extra_input32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
+SECP256K1_API int secp256k1_frost_nonce_agg(
+    const secp256k1_context* ctx,
+    secp256k1_frost_aggnonce  *aggnonce,
+    const secp256k1_frost_pubnonce * const* pubnonces,
+    size_t n_pubnonces
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_nonce_process(
+    const secp256k1_context* ctx,
+    secp256k1_frost_session *session,
+    const secp256k1_frost_aggnonce  *aggnonce,
+    const secp256k1_frost_pubnonce * const* pubnonces,
+    size_t n_pubnonces,
+    const unsigned char *msg32,
+    const secp256k1_xonly_pubkey *agg_pk
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7);
 
 SECP256K1_API int secp256k1_frost_partial_sign(
     const secp256k1_context* ctx,
-    secp256k1_musig_partial_sig *partial_sig,
-    secp256k1_musig_secnonce *secnonce,
+    secp256k1_frost_partial_sig *partial_sig,
+    secp256k1_frost_secnonce *secnonce,
     const secp256k1_frost_share *agg_share,
-    const secp256k1_musig_session *session,
+    const secp256k1_frost_session *session,
     size_t n_signers,
     size_t *indexes,
     size_t my_index
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(7);
 
-/* TODO: serialization APIs */
+SECP256K1_API int secp256k1_frost_partial_sig_agg(
+    const secp256k1_context* ctx,
+    unsigned char *sig64,
+    const secp256k1_frost_session *session,
+    const secp256k1_frost_partial_sig * const* partial_sigs,
+    size_t n_sigs
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
+/* TODO: more serialization APIs */
+
+SECP256K1_API int secp256k1_frost_pubnonce_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out66,
+    const secp256k1_frost_pubnonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+SECP256K1_API int secp256k1_frost_aggnonce_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out66,
+    const secp256k1_frost_aggnonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 #ifdef __cplusplus
 }
