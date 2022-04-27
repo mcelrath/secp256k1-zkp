@@ -362,21 +362,7 @@ int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, secp256k1_musig_aggn
     }
     for (i = 0; i < 2; i++) {
         if (secp256k1_gej_is_infinity(&aggnonce_ptj[i])) {
-            /* There must be at least one dishonest signer. If we would return 0
-               here, we will never be able to determine who it is. Therefore, we
-               should continue such that the culprit is revealed when collecting
-               and verifying partial signatures.
-
-               However, dealing with the point at infinity (loading,
-               de-/serializing) would require a lot of extra code complexity.
-               Instead, we set the aggregate nonce to some arbitrary point (the
-               generator). This is secure, because it only restricts the
-               abilities of the attacker: an attacker that forces the sum of
-               nonces to be infinity by sending some maliciously generated nonce
-               pairs can be turned into an attacker that forces the sum to be
-               the generator (by simply adding the generator to one of the
-               malicious nonces), and this does not change the winning condition
-               of the EUF-CMA game. */
+            /* Set to G according to the specification */
             aggnonce_pt[i] = secp256k1_ge_const_g;
         } else {
             secp256k1_ge_set_gej(&aggnonce_pt[i], &aggnonce_ptj[i]);
@@ -527,72 +513,19 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
         return 0;
     }
     secp256k1_fe_normalize_var(&pk.y);
-    /* Determine if the secret key sk should be negated before signing.
-     *
-     * We use the following notation:
-     * - |.| is a function that normalizes a point to an even Y by negating
-     *       if necessary, similar to secp256k1_extrakeys_ge_even_y
-     * - mu[i] is the i-th KeyAgg coefficient
-     * - t[i] is the i-th tweak
-     *
-     * The following public keys arise as intermediate steps:
-     * - P[i] is the i-th public key with corresponding secret key x[i]
-     *   P[i] := x[i]*G
-     * - P_agg is the aggregate public key
-     *   P_agg := mu[0]*|P[0]| + ... + mu[n-1]*|P[n-1]|
-     * - P_tweak[i] is the tweaked public key after the i-th tweaking operation
-     *   P_tweak[0] := P_agg
-     *   P_tweak[i] := |P_tweak[i-1]| + t[i]*G for i = 1, ..., m
-     *
-     * Note that our goal is to produce a partial signature corresponding to
-     * the final public key after m tweaking operations P_final = |P_tweak[m]|.
-     *
-     * Define d[i], d_agg, and d_tweak[i] so that:
-     * - |P[i]| = d[i]*P[i]
-     * - |P_agg| = d_agg*P_agg
-     * - |P_tweak[i]| = d_tweak[i]*P_tweak[i]
-     *
-     * In other words, d[i] = 1 if P[i] has even y coordinate, -1 otherwise;
-     * similarly for d_agg and d_tweak[i].
-     *
-     * The (xonly) final public key is P_final = |P_tweak[m]|
-     *   = d_tweak[m]*P_tweak[m]
-     *   = d_tweak[m]*(|P_tweak[m-1]| + t[m]*G)
-     *   = d_tweak[m]*(d_tweak[m-1]*(|P_tweak[m-2]| + t[m-1]*G) + t[m]*G)
-     *   = d_tweak[m]*...*d_tweak[1]*|P_agg| + (d_tweak[m]*t[m]+...+*d_tweak[1]*t[1])*G.
-     * To simplify the equation let us define
-     *   t := d_tweak[m]*t[m]+...+*d_tweak[1]*t[1]
-     *   d_tweak := d_tweak[m]*...*d_tweak[1].
-     * Then we have
-     *   P_final - t*G
-     *   = d_tweak*|P_agg|
-     *   = d_tweak*d_agg*P_agg
-     *   = d_tweak*d_agg*(mu[0]*|P[0]| + ... + mu[n-1]*|P[n-1]|)
-     *   = d_tweak*d_agg*(d[0]*mu[0]*P[0] + ... + d[n-1]*mu[n-1]*P[n-1])
-     *   = sum((d_tweak*d_agg*d[i])*mu[i]*x[i])*G.
-     *
-     * Thus whether signer i should use the negated x[i] depends on the product
-     * d_tweak[m]*...*d_tweak[1]*d_agg*d[i]. In other words, negate if and only
-     * if the following holds:
-     *   (P[i] has odd y) XOR (P_agg has odd y)
-     *     XOR (P_tweak[1] has odd y) XOR ... XOR (P_tweak[m] has odd y)
-     *
-     * Let us now look at how the terms in the equation correspond to the if
-     * condition below for some values of m:
-     * m = 0: P_i has odd y = secp256k1_fe_is_odd(&pk.y)
-     *        P_agg has odd y = secp256k1_fe_is_odd(&cache_i.pk.y)
-     *        cache_i.internal_key_parity = 0
-     * m = 1: P_i has odd y = secp256k1_fe_is_odd(&pk.y)
-     *        P_agg has odd y = cache_i.internal_key_parity
-     *        P_tweak[1] has odd y = secp256k1_fe_is_odd(&cache_i.pk.y)
-     * m = 2: P_i has odd y = secp256k1_fe_is_odd(&pk.y)
-     *        P_agg has odd y XOR P_tweak[1] has odd y = cache_i.internal_key_parity
-     *        P_tweak[2] has odd y = secp256k1_fe_is_odd(&cache_i.pk.y)
-     * etc.
+
+    /* The specification requires that the secret key is multiplied by
+     * g[v]*g*gp. All factors are -1 or 1. The value g[v] is -1 iff
+     * secp256k1_fe_is_odd(&cache_i.pk.y)), g is is -1 iff parity_acc is 1 and
+     * gp is -1 if secp256k1_fe_is_odd(&pk.y). Therefore, multiplying by
+     * g[v]*g*gp is equivalent to negating if
+     *     secp256k1_fe_is_odd(&cache_i.pk.y))
+     *       XOR cache_i.parity_acc
+     *       XOR secp256k1_fe_is_odd(&pk.y).
      */
-    if ((secp256k1_fe_is_odd(&pk.y)
-         != secp256k1_fe_is_odd(&cache_i.pk.y))
-         != cache_i.internal_key_parity) {
+    if ((secp256k1_fe_is_odd(&cache_i.pk.y)
+         != cache_i.parity_acc)
+         != secp256k1_fe_is_odd(&pk.y)) {
         secp256k1_scalar_negate(&sk, &sk);
     }
 
@@ -664,51 +597,13 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     secp256k1_musig_keyaggcoef(&mu, &cache_i, &pkp.x);
     secp256k1_scalar_mul(&e, &session_i.challenge, &mu);
 
-    /* If the MuSig-aggregate point has an odd Y coordinate, the signers will
-     * sign for the negation of their individual xonly public key. If the
-     * aggregate key is untweaked, then internal_key_parity is 0, so `e` is
-     * negated exactly when the aggregate key parity is odd. If the aggregate
-     * key is tweaked, then negation happens when the aggregate key has an odd Y
-     * coordinate XOR the internal key has an odd Y coordinate.*/
-
-    /* When producing a partial signature, signer i uses a possibly
-     * negated secret key:
-     *
-     *   sk[i] = (d_tweak*d_agg*d[i])*x[i]
-     *
-     * to ensure that the aggregate signature will correspond to
-     * an aggregate public key with even Y coordinate (see the
-     * notation and explanation in musig_partial_sign).
-     *
-     * We use the following additional notation:
-     * - e is the (Schnorr signature) challenge
-     * - r[i] is the i-th signer's secret nonce
-     * - R[i] = r[i]*G is the i-th signer's public nonce
-     * - R is the aggregated public nonce
-     * - d_nonce is chosen so that |R| = d_nonce*R
-     *
-     * The i-th partial signature is:
-     *
-     *   s[i] = d_nonce*r[i] + mu[i]*e*sk[i]
-     *
-     * In order to verify this partial signature, we need to check:
-     *
-     *   s[i]*G = d_nonce*R[i] + mu[i]*e*sk[i]*G
-     *
-     * The verifier doesn't have access to sk[i]*G, but can construct
-     * it using the xonly public key |P[i]| as follows:
-     *
-     *   sk[i]*G = d_tweak*d_agg*d[i]*x[i]*G
-     *           = d_tweak*d_agg*d[i]*P[i]
-     *           = d_tweak*d_agg*|P[i]|
-     *
-     * The if condition below is true whenever d_tweak*d_agg is
-     * negative (again, see the explanation in musig_partial_sign). In
-     * this case, the verifier negates e which will have the same end
-     * result as negating |P[i]|, since they are multiplied later anyway.
-     */
+    /* The specification requires that the public key is multiplied by g[v]*g.
+     * All factors are -1 or 1. The value g[v] is -1 iff
+     * secp256k1_fe_is_odd(&cache_i.pk.y)) and g is is -1 iff parity_acc is 1.
+     * Therefore, multiplying by g[v]*g is equivalent to negating if
+     * fe_is_odd(&cache_i.pk.y) XOR parity_acc. */
     if (secp256k1_fe_is_odd(&cache_i.pk.y)
-            != cache_i.internal_key_parity) {
+            != cache_i.parity_acc) {
         secp256k1_scalar_negate(&e, &e);
     }
 

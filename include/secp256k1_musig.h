@@ -223,16 +223,77 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
     size_t n_pubkeys
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(5);
 
-/** Tweak an x-only public key in a given keyagg_cache by adding
- *  the generator multiplied with `tweak32` to it.
+/** Obtain the aggregate public key from a keyagg_cache.
+ *
+ *  This is only useful if you need the non-xonly public key, in particular for
+ *  ordinary (non-xonly) tweaking or batch-verifying multiple key aggregations
+ *  (not implemented).
+ *
+ *  Returns: 0 if the arguments are invalid, 1 otherwise
+ *  Args:        ctx: pointer to a context object
+ *  Out:      agg_pk: the MuSig-aggregated public key.
+ *  In: keyagg_cache: pointer to a `musig_keyagg_cache` struct initialized by
+ *                    `musig_pubkey_agg`
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_get(
+    const secp256k1_context* ctx,
+    secp256k1_pubkey *agg_pk,
+    secp256k1_musig_keyagg_cache *keyagg_cache
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Apply ordinary "EC" tweaking to a public key in a given keyagg_cache by
+ *  adding the generator multiplied with `tweak32` to it. This is useful for
+ *  deriving child keys from an aggregate public key via BIP32.
+ *
+ *  The tweaking method is the same as `secp256k1_ec_pubkey_tweak_add`. So after
+ *  the following pseudocode buf and buf2 have identical contents (absent
+ *  earlier failures).
+ *
+ *  secp256k1_musig_pubkey_agg(..., keyagg_cache, pubkeys, ...)
+ *  secp256k1_musig_pubkey_get(..., agg_pk, keyagg_cache)
+ *  secp256k1_musig_pubkey_ec_tweak_add(..., output_pk, tweak32, keyagg_cache)
+ *  secp256k1_ec_pubkey_serialize(..., buf, output_pk)
+ *  secp256k1_ec_pubkey_tweak_add(..., agg_pk, tweak32)
+ *  secp256k1_ec_pubkey_serialize(..., buf2, agg_pk)
+ *
+ *  This function is required if you want to _sign_ for a tweaked aggregate key.
+ *  On the other hand, if you are only computing a public key, but not intending
+ *  to create a signature for it, you can just use
+ *  `secp256k1_ec_pubkey_tweak_add`.
+ *
+ *  Returns: 0 if the arguments are invalid or the resulting public key would be
+ *           invalid (only when the tweak is the negation of the corresponding
+ *           secret key). 1 otherwise.
+ *  Args:            ctx: pointer to a context object initialized for verification
+ *  Out:   output_pubkey: pointer to a public key to store the result. Will be set
+ *                        to an invalid value if this function returns 0. If you
+ *                        do not need it, this arg can be NULL.
+ *  In/Out: keyagg_cache: pointer to a `musig_keyagg_cache` struct initialized by
+ *                       `musig_pubkey_agg`
+ *  In:          tweak32: pointer to a 32-byte tweak. If the tweak is invalid
+ *                        according to `secp256k1_ec_seckey_verify`, this function
+ *                        returns 0. For uniformly random 32-byte arrays the
+ *                        chance of being invalid is negligible (around 1 in
+ *                        2^128).
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_ec_tweak_add(
+    const secp256k1_context* ctx,
+    secp256k1_pubkey *output_pubkey,
+    secp256k1_musig_keyagg_cache *keyagg_cache,
+    const unsigned char *tweak32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
+/** Apply x-only tweaking to a public key in a given keyagg_cache by adding the
+ *  generator multiplied with `tweak32` to it. This is useful for creating
+ *  Taproot outputs.
  *
  *  The tweaking method is the same as `secp256k1_xonly_pubkey_tweak_add`. So in
  *  the following pseudocode xonly_pubkey_tweak_add_check (absent earlier
  *  failures) returns 1.
  *
  *  secp256k1_musig_pubkey_agg(..., agg_pk, keyagg_cache, pubkeys, ...)
- *  secp256k1_musig_pubkey_tweak_add(..., output_pubkey, tweak32, keyagg_cache)
- *  secp256k1_xonly_pubkey_serialize(..., buf, output_pubkey)
+ *  secp256k1_musig_pubkey_xonly_tweak_add(..., output_pk, tweak32, keyagg_cache)
+ *  secp256k1_xonly_pubkey_serialize(..., buf, output_pk)
  *  secp256k1_xonly_pubkey_tweak_add_check(..., buf, ..., agg_pk, tweak32)
  *
  *  This function is required if you want to _sign_ for a tweaked aggregate key.
@@ -255,7 +316,7 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
  *                        chance of being invalid is negligible (around 1 in
  *                        2^128).
  */
-SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_xonly_tweak_add(
     const secp256k1_context* ctx,
     secp256k1_pubkey *output_pubkey,
     secp256k1_musig_keyagg_cache *keyagg_cache,
@@ -399,6 +460,18 @@ SECP256K1_API int secp256k1_musig_partial_sign(
 
 /** Verifies an individual signer's partial signature
  *
+ *  The signature is verified for a specific signing session. In order to avoid
+ *  accidentally verifying a signature from a different or non-existing signing
+ *  session, you must ensure the following:
+ *    1. The `keyagg_cache` argument is identical to the one used to create the
+ *       `session` with `musig_nonce_process`.
+ *    2. The `pubkey` argument must be identical to the one sent by the signer
+ *       before aggregating it with `musig_pubkey_agg` to create the
+ *       `keyagg_cache`.
+ *    3. The `pubnonce` argument must be identical to the one sent by the signer
+ *       before aggregating it with `musig_nonce_agg` and using the result to
+ *       create the `session` with `musig_nonce_process`.
+ *
  *  This function is essential when using protocols with adaptor signatures.
  *  However, it is not essential for regular MuSig sessions, in the sense that if any
  *  partial signature does not verify, the full signature will not verify either, so the
@@ -408,13 +481,14 @@ SECP256K1_API int secp256k1_musig_partial_sign(
  *  Returns: 0 if the arguments are invalid or the partial signature does not
  *           verify, 1 otherwise
  *  Args         ctx: pointer to a context object, initialized for verification
- *  In:  partial_sig: pointer to partial signature to verify
- *          pubnonce: public nonce sent by the signer who produced the signature
- *            pubkey: public key of the signer who produced the signature
+ *  In:  partial_sig: pointer to partial signature to verify, sent by
+ *                    the signer associated with `pubnonce` and `pubkey`
+ *          pubnonce: public nonce of the signer in the signing session
+ *            pubkey: public key of the signer in the signing session
  *      keyagg_cache: pointer to the keyagg_cache that was output when the
- *                    aggregate public key for this session
+ *                    aggregate public key for this signing session
  *           session: pointer to the session that was created with
- *                    musig_nonce_process
+ *                    `musig_nonce_process`
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verify(
     const secp256k1_context* ctx,
