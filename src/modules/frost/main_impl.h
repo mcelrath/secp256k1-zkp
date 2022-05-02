@@ -45,27 +45,78 @@ static const unsigned char secp256k1_frost_pubnonce_magic[4] = { 0x8b, 0xcf, 0xe
 
 /* Requires that none of the provided group elements is infinity. Works for both
  * frost_pubnonce and frost_aggnonce. */
-static void secp256k1_frost_pubnonce_save(secp256k1_frost_pubnonce* nonce, secp256k1_ge* ge) {
+static void secp256k1_frost_pubnonce_save(secp256k1_frost_pubnonce* nonce, secp256k1_ge* ge, uint16_t idx) {
     int i;
     memcpy(&nonce->data[0], secp256k1_frost_pubnonce_magic, 4);
+    nonce->data[4] = (idx + 1) >> 8;
+    nonce->data[5] = (idx + 1) & 0xFF;
+    for (i = 0; i < 2; i++) {
+        secp256k1_point_save(nonce->data + 6+64*i, &ge[i]);
+    }
+}
+
+/* Returns 1 unless the nonce wasn't properly initialized */
+static int secp256k1_frost_pubnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, uint16_t* idx, const secp256k1_frost_pubnonce* nonce) {
+    int i;
+
+    ARG_CHECK(secp256k1_memcmp_var(&nonce->data[0], secp256k1_frost_pubnonce_magic, 4) == 0);
+    *idx = (nonce->data[4] << 8) + nonce->data[5] - 1;
+    for (i = 0; i < 2; i++) {
+        secp256k1_point_load(&ge[i], nonce->data + 6+64*i);
+    }
+    return 1;
+}
+
+int secp256k1_frost_pubnonce_serialize(const secp256k1_context* ctx, unsigned char *out68, const secp256k1_frost_pubnonce* nonce) {
+    secp256k1_ge ge[2];
+    int i;
+    uint16_t idx;
+
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(out68 != NULL);
+    memset(out68, 0, 68);
+    ARG_CHECK(nonce != NULL);
+
+    if (!secp256k1_frost_pubnonce_load(ctx, ge, &idx, nonce)) {
+        return 0;
+    }
+    out68[0] = (idx + 1) >> 8;
+    VERIFY_CHECK(out68[0] == nonce->data[4]);
+    out68[1] = (idx + 1) & 0xFF;
+    VERIFY_CHECK(out68[1] == nonce->data[5]);
+    for (i = 0; i < 2; i++) {
+        int ret;
+        size_t size = 33;
+        ret = secp256k1_eckey_pubkey_serialize(&ge[i], &out68[2+33*i], &size, 1);
+        /* serialize must succeed because the point was just loaded */
+        VERIFY_CHECK(ret && size == 33);
+    }
+    return 1;
+}
+
+
+static const unsigned char secp256k1_frost_aggnonce_magic[4] = { 0x37, 0x21, 0x75, 0xe3 };
+
+static void secp256k1_frost_aggnonce_save(secp256k1_frost_aggnonce* nonce, secp256k1_ge* ge) {
+    int i;
+    memcpy(&nonce->data[0], secp256k1_frost_aggnonce_magic, 4);
     for (i = 0; i < 2; i++) {
         secp256k1_point_save(nonce->data + 4+64*i, &ge[i]);
     }
 }
 
-/* Works for both frost_pubnonce and frost_aggnonce. Returns 1 unless the nonce
- * wasn't properly initialized */
-static int secp256k1_frost_pubnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_frost_pubnonce* nonce) {
+/* Returns 1 unless the nonce wasn't properly initialized */
+static int secp256k1_frost_aggnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_frost_aggnonce* nonce) {
     int i;
 
-    ARG_CHECK(secp256k1_memcmp_var(&nonce->data[0], secp256k1_frost_pubnonce_magic, 4) == 0);
+    ARG_CHECK(secp256k1_memcmp_var(&nonce->data[0], secp256k1_frost_aggnonce_magic, 4) == 0);
     for (i = 0; i < 2; i++) {
-        secp256k1_point_load(&ge[i], nonce->data + 4 + 64*i);
+        secp256k1_point_load(&ge[i], nonce->data + 4+64*i);
     }
     return 1;
 }
 
-int secp256k1_frost_pubnonce_serialize(const secp256k1_context* ctx, unsigned char *out66, const secp256k1_frost_pubnonce* nonce) {
+int secp256k1_frost_aggnonce_serialize(const secp256k1_context* ctx, unsigned char *out66, const secp256k1_frost_aggnonce* nonce) {
     secp256k1_ge ge[2];
     int i;
 
@@ -74,7 +125,7 @@ int secp256k1_frost_pubnonce_serialize(const secp256k1_context* ctx, unsigned ch
     memset(out66, 0, 66);
     ARG_CHECK(nonce != NULL);
 
-    if (!secp256k1_frost_pubnonce_load(ctx, ge, nonce)) {
+    if (!secp256k1_frost_aggnonce_load(ctx, ge, nonce)) {
         return 0;
     }
     for (i = 0; i < 2; i++) {
@@ -85,10 +136,6 @@ int secp256k1_frost_pubnonce_serialize(const secp256k1_context* ctx, unsigned ch
         VERIFY_CHECK(ret && size == 33);
     }
     return 1;
-}
-
-int secp256k1_frost_aggnonce_serialize(const secp256k1_context* ctx, unsigned char *out66, const secp256k1_frost_aggnonce* nonce) {
-    return secp256k1_frost_pubnonce_serialize(ctx, out66, (secp256k1_frost_pubnonce*) nonce);
 }
 
 static const unsigned char secp256k1_frost_session_cache_magic[4] = { 0x9d, 0xed, 0xe9, 0x17 };
@@ -149,14 +196,6 @@ static int secp256k1_frost_partial_sig_load(const secp256k1_context* ctx, secp25
     /* Parsed signatures can not overflow */
     VERIFY_CHECK(!overflow);
     return 1;
-}
-
-static void secp256k1_frost_aggnonce_save(secp256k1_frost_aggnonce* nonce, secp256k1_ge* ge) {
-    secp256k1_frost_pubnonce_save((secp256k1_frost_pubnonce *) nonce, ge);
-}
-
-static int secp256k1_frost_aggnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_frost_aggnonce* nonce) {
-    return secp256k1_frost_pubnonce_load(ctx, ge, (secp256k1_frost_pubnonce *) nonce);
 }
 
 /* Generate polynomial coefficients, coefficient commitments, and shares, from
@@ -448,7 +487,7 @@ static void secp256k1_nonce_function_frost(secp256k1_scalar *k, const unsigned c
     }
 }
 
-int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secnonce *secnonce, secp256k1_frost_pubnonce *pubnonce, const unsigned char *session_id32, const secp256k1_frost_share *agg_share, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
+int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secnonce *secnonce, secp256k1_frost_pubnonce *pubnonce, const unsigned char *session_id32, uint16_t my_index, const secp256k1_frost_share *agg_share, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
     secp256k1_scalar k[2];
     secp256k1_ge nonce_pt[2];
     int i;
@@ -504,11 +543,12 @@ int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secn
         secp256k1_scalar_clear(&k[i]);
     }
     /* nonce_pt won't be infinity because k != 0 with overwhelming probability */
-    secp256k1_frost_pubnonce_save(pubnonce, nonce_pt);
+    secp256k1_frost_pubnonce_save(pubnonce, nonce_pt, my_index);
     return ret;
 }
 
 static int secp256k1_frost_sum_nonces(const secp256k1_context* ctx, secp256k1_gej *summed_nonces, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces) {
+    uint16_t idx;
     uint16_t i;
     int j;
 
@@ -517,7 +557,7 @@ static int secp256k1_frost_sum_nonces(const secp256k1_context* ctx, secp256k1_ge
 
     for (i = 0; i < n_pubnonces; i++) {
         secp256k1_ge nonce_pt[2];
-        if (!secp256k1_frost_pubnonce_load(ctx, nonce_pt, pubnonces[i])) {
+        if (!secp256k1_frost_pubnonce_load(ctx, nonce_pt, &idx, pubnonces[i])) {
             return 0;
         }
         for (j = 0; j < 2; j++) {
@@ -573,11 +613,7 @@ static int secp256k1_frost_compute_noncehash(const secp256k1_context* ctx, unsig
 
     secp256k1_sha256_initialize_tagged(&sha, (unsigned char*)"FROST/noncecoef", sizeof("FROST/noncecoef") - 1);
     for (i = 0; i < n_pubnonces; i++) {
-        /* TODO: validate that n_pubnonces is not larger than 16-bit */
-        buf[0] = (i + 1) >> 8;
-        buf[1] = (i + 1) & 0xFF;
-
-        if (!secp256k1_frost_pubnonce_serialize(ctx, &buf[2], pubnonces[i])) {
+        if (!secp256k1_frost_pubnonce_serialize(ctx, buf, pubnonces[i])) {
             return 0;
         }
         secp256k1_sha256_write(&sha, buf, sizeof(buf));

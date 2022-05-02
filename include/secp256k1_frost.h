@@ -36,7 +36,7 @@ typedef struct {
 } secp256k1_frost_secnonce;
 
 typedef struct {
-    unsigned char data[132];
+    unsigned char data[134];
 } secp256k1_frost_pubnonce;
 
 typedef struct {
@@ -87,6 +87,7 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
     secp256k1_frost_secnonce *secnonce,
     secp256k1_frost_pubnonce *pubnonce,
     const unsigned char *session_id32,
+    uint16_t my_index,
     const secp256k1_frost_share *agg_share,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
