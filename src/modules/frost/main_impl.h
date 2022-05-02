@@ -161,9 +161,9 @@ static int secp256k1_frost_aggnonce_load(const secp256k1_context* ctx, secp256k1
 
 /* Generate polynomial coefficients, coefficient commitments, and shares, from
  * a seed and a secret key. */
-static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, size_t threshold, size_t n_participants, const unsigned char *seckey32) {
+static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const unsigned char *seckey32) {
     secp256k1_sha256 sha;
-    size_t i;
+    uint16_t i;
     int overflow;
     secp256k1_scalar const_term;
     secp256k1_gej rj;
@@ -204,7 +204,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
     }
 
     for (i = 0; i < n_participants; i++) {
-        size_t j;
+        uint16_t j;
         secp256k1_scalar share_i;
         secp256k1_scalar scalar_i;
         secp256k1_scalar rand[2];
@@ -228,7 +228,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
 }
 
 /* TODO: add optional aux data */
-int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, size_t threshold, size_t n_participants, const secp256k1_keypair *keypair) {
+int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const secp256k1_keypair *keypair) {
     secp256k1_scalar sk;
     secp256k1_ge pk;
     unsigned char buf[32];
@@ -273,9 +273,9 @@ static void secp256k1_frost_vsslist_sha256(secp256k1_sha256 *sha) {
 }
 
 /* Computes vss_hash = tagged_hash(pk[0], ..., pk[np-1]) */
-static int secp256k1_frost_compute_vss_hash(const secp256k1_context *ctx, unsigned char *vss_hash, const secp256k1_pubkey * const* pk, size_t np, size_t t) {
+static int secp256k1_frost_compute_vss_hash(const secp256k1_context *ctx, unsigned char *vss_hash, const secp256k1_pubkey * const* pk, uint16_t np, uint16_t t) {
     secp256k1_sha256 sha;
-    size_t i, j;
+    uint16_t i, j;
     size_t size = 33;
 
     secp256k1_frost_vsslist_sha256(&sha);
@@ -303,7 +303,7 @@ typedef struct {
 typedef struct {
     const secp256k1_context *ctx;
     const secp256k1_pubkey * const* pks;
-    size_t threshold;
+    uint16_t threshold;
 } secp256k1_frost_pubkey_combine_ecmult_data;
 
 static int secp256k1_frost_verify_share_ecmult_callback(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void *data) {
@@ -326,13 +326,13 @@ static int secp256k1_frost_pubkey_combine_callback(secp256k1_scalar *sc, secp256
     return secp256k1_pubkey_load(ctx->ctx, pt, &ctx->pks[idx][0]);
 }
 
-int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* pubcoeffs, size_t n_shares, size_t threshold, size_t my_index) {
+int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* pubcoeffs, uint16_t n_shares, uint16_t threshold, uint16_t my_index) {
     secp256k1_frost_pubkey_combine_ecmult_data pubkey_combine_ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
     int pk_parity;
     secp256k1_scalar acc;
-    size_t i;
+    uint16_t i;
     int overflow;
 
 
@@ -508,8 +508,8 @@ int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secn
     return ret;
 }
 
-static int secp256k1_frost_sum_nonces(const secp256k1_context* ctx, secp256k1_gej *summed_nonces, const secp256k1_frost_pubnonce * const* pubnonces, size_t n_pubnonces) {
-    size_t i;
+static int secp256k1_frost_sum_nonces(const secp256k1_context* ctx, secp256k1_gej *summed_nonces, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces) {
+    uint16_t i;
     int j;
 
     secp256k1_gej_set_infinity(&summed_nonces[0]);
@@ -527,7 +527,7 @@ static int secp256k1_frost_sum_nonces(const secp256k1_context* ctx, secp256k1_ge
     return 1;
 }
 
-int secp256k1_frost_nonce_agg(const secp256k1_context* ctx, secp256k1_frost_aggnonce  *aggnonce, const secp256k1_frost_pubnonce * const* pubnonces, size_t n_pubnonces) {
+int secp256k1_frost_nonce_agg(const secp256k1_context* ctx, secp256k1_frost_aggnonce  *aggnonce, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces) {
     secp256k1_gej aggnonce_ptj[2];
     secp256k1_ge aggnonce_pt[2];
     int i;
@@ -566,10 +566,10 @@ int secp256k1_frost_nonce_agg(const secp256k1_context* ctx, secp256k1_frost_aggn
 }
 
 /* Implements binding factor from draft-irtf-cfrg-frost-04, section 4.4. */
-static int secp256k1_frost_compute_noncehash(const secp256k1_context* ctx, unsigned char *noncehash, const unsigned char *msg, const secp256k1_frost_pubnonce * const* pubnonces, size_t n_pubnonces) {
+static int secp256k1_frost_compute_noncehash(const secp256k1_context* ctx, unsigned char *noncehash, const unsigned char *msg, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces) {
     unsigned char buf[68];
     secp256k1_sha256 sha;
-    size_t i;
+    uint16_t i;
 
     secp256k1_sha256_initialize_tagged(&sha, (unsigned char*)"FROST/noncecoef", sizeof("FROST/noncecoef") - 1);
     for (i = 0; i < n_pubnonces; i++) {
@@ -587,7 +587,7 @@ static int secp256k1_frost_compute_noncehash(const secp256k1_context* ctx, unsig
     return 1;
 }
 
-static int secp256k1_frost_nonce_process_internal(const secp256k1_context* ctx, int *fin_nonce_parity, unsigned char *fin_nonce, secp256k1_scalar *b, secp256k1_gej *aggnoncej, const unsigned char *msg, const secp256k1_frost_pubnonce * const* pubnonces, size_t n_pubnonces) {
+static int secp256k1_frost_nonce_process_internal(const secp256k1_context* ctx, int *fin_nonce_parity, unsigned char *fin_nonce, secp256k1_scalar *b, secp256k1_gej *aggnoncej, const unsigned char *msg, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces) {
     unsigned char noncehash[32];
     secp256k1_ge fin_nonce_pt;
     secp256k1_gej fin_nonce_ptj;
@@ -616,7 +616,7 @@ static int secp256k1_frost_nonce_process_internal(const secp256k1_context* ctx, 
     return 1;
 }
 
-int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_session *session, const secp256k1_frost_aggnonce *aggnonce, const secp256k1_frost_pubnonce * const* pubnonces, size_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk) {
+int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_session *session, const secp256k1_frost_aggnonce *aggnonce, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk) {
     secp256k1_ge aggnonce_pt[2];
     secp256k1_gej aggnonce_ptj[2];
     unsigned char fin_nonce[32];
@@ -649,8 +649,8 @@ int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_
     return 1;
 }
 
-static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, size_t *participant_indexes, size_t n_participants, size_t my_index) {
-    size_t i;
+static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, uint16_t *participant_indexes, uint16_t n_participants, uint16_t my_index) {
+    uint16_t i;
     secp256k1_scalar num;
     secp256k1_scalar den;
     secp256k1_scalar idx;
@@ -682,7 +682,7 @@ void secp256k1_frost_partial_sign_clear(secp256k1_scalar *sk, secp256k1_scalar *
 }
 
 /* TODO: partial sig verification function */
-int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_partial_sig *partial_sig, secp256k1_frost_secnonce *secnonce, const secp256k1_frost_share *agg_share, const secp256k1_frost_session *session, size_t n_signers, size_t *indexes, size_t my_index) {
+int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_partial_sig *partial_sig, secp256k1_frost_secnonce *secnonce, const secp256k1_frost_share *agg_share, const secp256k1_frost_session *session, uint16_t n_signers, uint16_t *indexes, uint16_t my_index) {
     secp256k1_scalar sk, l;
     secp256k1_scalar k[2];
     secp256k1_scalar s;
@@ -732,8 +732,8 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
     return 1;
 }
 
-int secp256k1_frost_partial_sig_agg(const secp256k1_context* ctx, unsigned char *sig64, const secp256k1_frost_session *session, const secp256k1_frost_partial_sig * const* partial_sigs, size_t n_sigs) {
-    size_t i;
+int secp256k1_frost_partial_sig_agg(const secp256k1_context* ctx, unsigned char *sig64, const secp256k1_frost_session *session, const secp256k1_frost_partial_sig * const* partial_sigs, uint16_t n_sigs) {
+    uint16_t i;
     secp256k1_frost_session_internal session_i;
 
     VERIFY_CHECK(ctx != NULL);

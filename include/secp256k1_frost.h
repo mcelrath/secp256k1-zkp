@@ -65,8 +65,8 @@ SECP256K1_API int secp256k1_frost_share_gen(
     const secp256k1_context *ctx,
     secp256k1_pubkey *pubcoeff,
     secp256k1_frost_share *shares,
-    size_t threshold,
-    size_t n_participants,
+    uint16_t threshold,
+    uint16_t n_participants,
     const secp256k1_keypair *keypair
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(6);
 
@@ -77,9 +77,9 @@ SECP256K1_API int secp256k1_frost_share_agg(
     unsigned char *vss_hash,
     const secp256k1_frost_share * const* shares,
     const secp256k1_pubkey * const* pubcoeffs,
-    size_t n_shares,
-    size_t threshold,
-    size_t my_index
+    uint16_t n_shares,
+    uint16_t threshold,
+    uint16_t my_index
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 SECP256K1_API int secp256k1_frost_nonce_gen(
@@ -97,7 +97,7 @@ SECP256K1_API int secp256k1_frost_nonce_agg(
     const secp256k1_context* ctx,
     secp256k1_frost_aggnonce  *aggnonce,
     const secp256k1_frost_pubnonce * const* pubnonces,
-    size_t n_pubnonces
+    uint16_t n_pubnonces
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_nonce_process(
@@ -105,7 +105,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_nonce_process(
     secp256k1_frost_session *session,
     const secp256k1_frost_aggnonce  *aggnonce,
     const secp256k1_frost_pubnonce * const* pubnonces,
-    size_t n_pubnonces,
+    uint16_t n_pubnonces,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7);
@@ -116,9 +116,9 @@ SECP256K1_API int secp256k1_frost_partial_sign(
     secp256k1_frost_secnonce *secnonce,
     const secp256k1_frost_share *agg_share,
     const secp256k1_frost_session *session,
-    size_t n_signers,
-    size_t *indexes,
-    size_t my_index
+    uint16_t n_signers,
+    uint16_t *indexes,
+    uint16_t my_index
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(7);
 
 SECP256K1_API int secp256k1_frost_partial_sig_agg(
@@ -126,7 +126,7 @@ SECP256K1_API int secp256k1_frost_partial_sig_agg(
     unsigned char *sig64,
     const secp256k1_frost_session *session,
     const secp256k1_frost_partial_sig * const* partial_sigs,
-    size_t n_sigs
+    uint16_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /* TODO: more serialization APIs */

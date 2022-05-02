@@ -122,12 +122,12 @@ int sign_vss(const secp256k1_context* ctx, struct signer_secrets *signer_secrets
 /* Sign a message hash with the given threshold and aggregate shares and store
  * the result in sig */
 int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, const unsigned char* msg32, secp256k1_xonly_pubkey *agg_pk, unsigned char *sig64) {
-    int i;
+    uint16_t i;
     const secp256k1_frost_pubnonce *pubnonces[N_SIGNERS];
     const secp256k1_frost_partial_sig *partial_sigs[N_SIGNERS];
     /* The same for all signers */
     secp256k1_frost_session session;
-    size_t participants[THRESHOLD];
+    uint16_t participants[THRESHOLD];
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
