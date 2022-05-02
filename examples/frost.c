@@ -169,7 +169,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
             return 0;
         }
 
-        if (!secp256k1_frost_nonce_process(ctx, &session, &agg_pubnonce, pubnonces,THRESHOLD, msg32, agg_pk)) {
+        if (!secp256k1_frost_nonce_process(ctx, &session, &agg_pubnonce, pubnonces, THRESHOLD, msg32, agg_pk)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it to 0. That's because
