@@ -111,7 +111,7 @@ int sign_vss(const secp256k1_context* ctx, struct signer_secrets *signer_secrets
         }
         fclose(frand);
 
-        if (!secp256k1_schnorrsig_sign(ctx, sigs[i], signer[i].vss_hash, &signer_secrets[i].keypair, session_id)) {
+        if (!secp256k1_schnorrsig_sign32(ctx, sigs[i], signer[i].vss_hash, &signer_secrets[i].keypair, session_id)) {
             return 0;
         }
     }
