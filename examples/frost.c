@@ -169,14 +169,14 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
             return 0;
         }
 
-        if (!secp256k1_frost_nonce_process(ctx, &session, &agg_pubnonce, pubnonces, THRESHOLD, msg32, agg_pk)) {
+        if (!secp256k1_frost_nonce_process(ctx, &session, &agg_pubnonce, pubnonces, THRESHOLD, msg32, agg_pk, participants, i+1)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it to 0. That's because
          * you must _never_ reuse the secnonce (or use the same session_id to
          * create a secnonce). If you do, you effectively reuse the nonce and
          * leak the secret key. */
-        if (!secp256k1_frost_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].agg_share, &session, THRESHOLD, participants, i+1)) {
+        if (!secp256k1_frost_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].agg_share, &session)) {
             return 0;
         }
         partial_sigs[i] = &signer[i].partial_sig;
