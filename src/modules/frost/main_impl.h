@@ -55,12 +55,16 @@ static void secp256k1_frost_pubnonce_save(secp256k1_frost_pubnonce* nonce, secp2
     }
 }
 
+static void secp256k1_frost_pubnonce_load_idx(uint16_t* idx, const secp256k1_frost_pubnonce* nonce) {
+    *idx = (nonce->data[4] << 8) + nonce->data[5] - 1;
+}
+
 /* Returns 1 unless the nonce wasn't properly initialized */
 static int secp256k1_frost_pubnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, uint16_t* idx, const secp256k1_frost_pubnonce* nonce) {
     int i;
 
     ARG_CHECK(secp256k1_memcmp_var(&nonce->data[0], secp256k1_frost_pubnonce_magic, 4) == 0);
-    *idx = (nonce->data[4] << 8) + nonce->data[5] - 1;
+    secp256k1_frost_pubnonce_load_idx(idx, nonce);
     for (i = 0; i < 2; i++) {
         secp256k1_point_load(&ge[i], nonce->data + 6+64*i);
     }
@@ -652,25 +656,29 @@ static int secp256k1_frost_nonce_process_internal(const secp256k1_context* ctx, 
     return 1;
 }
 
-static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, uint16_t *participant_indexes, uint16_t n_participants, uint16_t my_index) {
+static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_participants, uint16_t idx) {
     uint16_t i;
     secp256k1_scalar num;
     secp256k1_scalar den;
-    secp256k1_scalar idx;
+    secp256k1_scalar party_idx;
 
     secp256k1_scalar_set_int(&num, 1);
     secp256k1_scalar_set_int(&den, 1);
-    secp256k1_scalar_set_int(&idx, my_index);
+    secp256k1_scalar_set_int(&party_idx, idx);
     for (i = 0; i < n_participants; i++) {
+        uint16_t counterparty_idx;
         secp256k1_scalar mul;
-        if (participant_indexes[i] == my_index) {
+
+        secp256k1_frost_pubnonce_load_idx(&counterparty_idx, pubnonces[i]);
+        if (counterparty_idx == idx) {
             continue;
         }
-        secp256k1_scalar_set_int(&mul, participant_indexes[i]);
+
+        secp256k1_scalar_set_int(&mul, counterparty_idx);
         secp256k1_scalar_negate(&mul, &mul);
         secp256k1_scalar_mul(&num, &num, &mul);
 
-        secp256k1_scalar_add(&mul, &mul, &idx);
+        secp256k1_scalar_add(&mul, &mul, &party_idx);
         secp256k1_scalar_mul(&den, &den, &mul);
     }
 
@@ -678,8 +686,7 @@ static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, uint16_t *
     secp256k1_scalar_mul(r, &num, &den);
 }
 
-/* TODO: read indexes from pubnonces */
-int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_session *session, const secp256k1_frost_aggnonce *aggnonce, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, uint16_t *indexes, uint16_t my_index) {
+int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_session *session, const secp256k1_frost_aggnonce *aggnonce, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, uint16_t idx) {
     secp256k1_ge aggnonce_pt[2];
     secp256k1_gej aggnonce_ptj[2];
     unsigned char fin_nonce[32];
@@ -706,7 +713,7 @@ int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_
     }
 
     secp256k1_schnorrsig_challenge(&session_i.challenge, fin_nonce, msg32, 32, agg_pk32);
-    secp256k1_frost_lagrange_coefficient(&l, indexes, n_pubnonces, my_index);
+    secp256k1_frost_lagrange_coefficient(&l, pubnonces, n_pubnonces, idx);
     secp256k1_scalar_mul(&session_i.challenge, &session_i.challenge, &l);
     secp256k1_scalar_set_int(&session_i.s_part, 0);
     memcpy(session_i.fin_nonce, fin_nonce, sizeof(session_i.fin_nonce));

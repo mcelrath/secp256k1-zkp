@@ -127,7 +127,6 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
     const secp256k1_frost_partial_sig *partial_sigs[N_SIGNERS];
     /* The same for all signers */
     secp256k1_frost_session session;
-    uint16_t participants[THRESHOLD];
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
@@ -150,15 +149,10 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         }
         /* Initialize session and create secret nonce for signing and public
          * nonce to send to the other signers. */
-        if (!secp256k1_frost_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, i, &signer_secrets[i].agg_share, msg32, NULL, NULL)) {
+        if (!secp256k1_frost_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, i+1, &signer_secrets[i].agg_share, msg32, NULL, NULL)) {
             return 0;
         }
         pubnonces[i] = &signer[i].pubnonce;
-    }
-
-    /* Set indexes of participants who will be signing */
-    for (i = 0; i < THRESHOLD; i++) {
-        participants[i] = i+1;
     }
 
     /* Signing communication round 1: Exchange nonces */
@@ -169,7 +163,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
             return 0;
         }
 
-        if (!secp256k1_frost_nonce_process(ctx, &session, &agg_pubnonce, pubnonces, THRESHOLD, msg32, agg_pk, participants, i+1)) {
+        if (!secp256k1_frost_nonce_process(ctx, &session, &agg_pubnonce, pubnonces, THRESHOLD, msg32, agg_pk, i+1)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it to 0. That's because
