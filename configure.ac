@@ -449,6 +449,8 @@ fi
 
 if test x"$enable_module_frost" = x"yes"; then
   AC_DEFINE(ENABLE_MODULE_FROST, 1, [Define this symbol to enable the FROST module])
+  enable_module_extrakeys=yes
+  enable_module_schnorrsig=yes
 fi
 
 ###
@@ -572,7 +574,7 @@ echo "  module schnorrsig       = $enable_module_schnorrsig"
 echo "  module musig            = $enable_module_musig"
 echo "  module ecdsa-s2c        = $enable_module_ecdsa_s2c"
 echo "  module ecdsa-adaptor    = $enable_module_ecdsa_adaptor"
-echo "  module frost            = $enable_module_ecdsa_adaptor"
+echo "  module frost            = $enable_module_frost"
 echo
 echo "  asm                     = $set_asm"
 echo "  ecmult window size      = $set_ecmult_window"
