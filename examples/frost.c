@@ -99,19 +99,19 @@ int sign_vss(const secp256k1_context* ctx, struct signer_secrets *signer_secrets
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
-        unsigned char session_id[32];
+        unsigned char aux_rand[32];
 
         frand = fopen("/dev/urandom", "r");
         if(frand == NULL) {
             return 0;
         }
-        if (!fread(session_id, 32, 1, frand)) {
+        if (!fread(aux_rand, 32, 1, frand)) {
             fclose(frand);
             return 0;
         }
         fclose(frand);
 
-        if (!secp256k1_schnorrsig_sign32(ctx, sigs[i], signer[i].vss_hash, &signer_secrets[i].keypair, session_id)) {
+        if (!secp256k1_schnorrsig_sign32(ctx, sigs[i], signer[i].vss_hash, &signer_secrets[i].keypair, aux_rand)) {
             return 0;
         }
     }
