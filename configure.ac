@@ -394,6 +394,11 @@ if test x"$enable_module_ecdh" = x"yes"; then
   AC_DEFINE(ENABLE_MODULE_ECDH, 1, [Define this symbol to enable the ECDH module])
 fi
 
+if test x"$enable_module_frost" = x"yes"; then
+  AC_DEFINE(ENABLE_MODULE_FROST, 1, [Define this symbol to enable the FROST module])
+  enable_module_musig=yes
+fi
+
 if test x"$enable_module_musig" = x"yes"; then
   AC_DEFINE(ENABLE_MODULE_MUSIG, 1, [Define this symbol to enable the MuSig module])
   enable_module_schnorrsig=yes
@@ -445,12 +450,6 @@ fi
 
 if test x"$enable_module_ecdsa_adaptor" = x"yes"; then
   AC_DEFINE(ENABLE_MODULE_ECDSA_ADAPTOR, 1, [Define this symbol to enable the ECDSA adaptor module])
-fi
-
-if test x"$enable_module_frost" = x"yes"; then
-  AC_DEFINE(ENABLE_MODULE_FROST, 1, [Define this symbol to enable the FROST module])
-  enable_module_extrakeys=yes
-  enable_module_schnorrsig=yes
 fi
 
 ###
