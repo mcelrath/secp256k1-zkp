@@ -369,6 +369,28 @@ static int secp256k1_frost_pubkey_combine_callback(secp256k1_scalar *sc, secp256
     return secp256k1_pubkey_load(ctx->ctx, pt, &ctx->pks[idx][0]);
 }
 
+static int vss_verify(const secp256k1_context* ctx, uint16_t threshold, uint16_t my_index, const secp256k1_scalar *share, const secp256k1_pubkey * const* vss_commitment) {
+    secp256k1_scalar share_neg;
+    secp256k1_gej tmpj;
+    secp256k1_frost_verify_share_ecmult_data verify_share_ecmult_data;
+
+    /* Use an EC multi-multiplication to verify the following equation:
+     *   0 = - share_i*G + my_index^0*vss_commitment[0]
+     *                   + ...
+     *                   + my_index^(threshold - 1)*vss_commitment[threshold - 1]*/
+    verify_share_ecmult_data.ctx = ctx;
+    verify_share_ecmult_data.pubcoeff = vss_commitment;
+    /* Evaluate the public polynomial at the index */
+    secp256k1_scalar_set_int(&verify_share_ecmult_data.idx, my_index);
+    secp256k1_scalar_set_int(&verify_share_ecmult_data.idxn, 1);
+    secp256k1_scalar_negate(&share_neg, share);
+    /* TODO: add scratch */
+    if (!secp256k1_ecmult_multi_var(&ctx->error_callback, NULL, &tmpj, &share_neg, secp256k1_frost_verify_share_ecmult_callback, (void *) &verify_share_ecmult_data, threshold)) {
+        return 0;
+    }
+    return secp256k1_gej_is_infinity(&tmpj);
+}
+
 int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* pubcoeffs, uint16_t n_shares, uint16_t threshold, uint16_t my_index) {
     secp256k1_frost_pubkey_combine_ecmult_data pubkey_combine_ecmult_data;
     secp256k1_gej pkj;
@@ -395,32 +417,14 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     secp256k1_scalar_clear(&acc);
     for (i = 0; i < n_shares; i++) {
         secp256k1_scalar share_i;
-        secp256k1_frost_verify_share_ecmult_data verify_share_ecmult_data;
-        secp256k1_gej sharej;
-        secp256k1_gej expectedj;
 
         secp256k1_scalar_set_b32(&share_i, shares[i]->data, &overflow);
         if (overflow) {
             return 0;
         }
-
-        verify_share_ecmult_data.ctx = ctx;
-        verify_share_ecmult_data.pubcoeff = &pubcoeffs[i];
-        /* Evaluate the public polynomial at the index */
-        secp256k1_scalar_set_int(&verify_share_ecmult_data.idx, my_index);
-        secp256k1_scalar_set_int(&verify_share_ecmult_data.idxn, 1);
-        /* TODO: add scratch */
-        if (!secp256k1_ecmult_multi_var(&ctx->error_callback, NULL, &sharej, NULL, secp256k1_frost_verify_share_ecmult_callback, (void *) &verify_share_ecmult_data, threshold)) {
+        if (!vss_verify(ctx, threshold, my_index, &share_i, &pubcoeffs[i])) {
             return 0;
         }
-        /* Verify share using VSS */
-        secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &expectedj, &share_i);
-        secp256k1_gej_neg(&expectedj, &expectedj);
-        secp256k1_gej_add_var(&expectedj, &expectedj, &sharej, NULL);
-        if (!secp256k1_gej_is_infinity(&expectedj)) {
-            return 0;
-        }
-
         secp256k1_scalar_add(&acc, &acc, &share_i);
     }
     if (!secp256k1_frost_compute_vss_hash(ctx, vss_hash, pubcoeffs, n_shares, threshold)) {
