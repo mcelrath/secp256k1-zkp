@@ -355,7 +355,7 @@ static int secp256k1_frost_verify_share_ecmult_callback(secp256k1_scalar *sc, se
 
     ret = secp256k1_pubkey_load(ctx->ctx, pt, *(ctx->pubcoeff)+idx);
     VERIFY_CHECK(ret);
-    secp256k1_scalar_mul(sc, &secp256k1_scalar_one, &ctx->idxn);
+    *sc = ctx->idxn;
     secp256k1_scalar_mul(&ctx->idxn, &ctx->idxn, &ctx->idx);
 
     return 1;
