@@ -185,15 +185,17 @@ musig_example_LDFLAGS += -lbcrypt
 endif
 TESTS += musig_example
 endif
-endif
-
 if ENABLE_MODULE_FROST
-noinst_PROGRAMS += example_frost
-example_frost_SOURCES = examples/frost.c
-example_frost_CPPFLAGS = -I$(top_srcdir)/include
-example_frost_LDADD = libsecp256k1.la
-example_frost_LDFLAGS = -static
-TESTS += example_frost
+noinst_PROGRAMS += frost_example
+frost_example_SOURCES = examples/frost.c
+frost_example_CPPFLAGS = -I$(top_srcdir)/include
+frost_example_LDADD = libsecp256k1.la
+frost_example_LDFLAGS = -static
+if BUILD_WINDOWS
+frost_example_LDFLAGS += -lbcrypt
+endif
+TESTS += frost_example
+endif
 endif
 
 ### Precomputed tables
