@@ -2,13 +2,12 @@
 #define SECP256K1_FROST_H
 
 #include "secp256k1_extrakeys.h"
-#include "../src/scalar.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stddef.h>
+#include <stdint.h>
 
 /** This code is currently a work in progress. It's not secure nor stable.  IT
  * IS EXTREMELY DANGEROUS AND RECKLESS TO USE THIS MODULE IN PRODUCTION!
@@ -42,14 +41,6 @@ typedef struct {
 typedef struct {
     unsigned char data[132];
 } secp256k1_frost_aggnonce;
-
-typedef struct {
-    int fin_nonce_parity;
-    unsigned char fin_nonce[32];
-    secp256k1_scalar noncecoef;
-    secp256k1_scalar challenge;
-    secp256k1_scalar s_part;
-} secp256k1_frost_session_internal;
 
 typedef struct {
     unsigned char data[133];
