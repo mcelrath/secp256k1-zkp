@@ -255,7 +255,7 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
  *  Returns: 0 if the arguments are invalid, 1 otherwise
  *  Args:           ctx: pointer to a context object
  *  Out:       aggnonce: pointer to an aggregate public nonce object for
- *                       musig_nonce_process
+ *                       frost_nonce_process
  *  In:       pubnonces: array of pointers to public nonces sent by the
  *                       signers
  *          n_pubnonces: number of elements in the pubnonces array. Must be
