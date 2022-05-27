@@ -50,7 +50,17 @@ typedef struct {
     unsigned char data[36];
 } secp256k1_frost_partial_sig;
 
-/* TODO: sanity check argument order */
+SECP256K1_API int secp256k1_frost_pubnonce_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out66,
+    const secp256k1_frost_pubnonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+SECP256K1_API int secp256k1_frost_aggnonce_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out66,
+    const secp256k1_frost_aggnonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 SECP256K1_API int secp256k1_frost_share_gen(
     const secp256k1_context *ctx,
@@ -70,7 +80,7 @@ SECP256K1_API int secp256k1_frost_share_agg(
     const secp256k1_pubkey * const* pubcoeffs,
     uint16_t n_shares,
     uint16_t threshold,
-    uint16_t my_index
+    uint16_t index
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 SECP256K1_API int secp256k1_frost_nonce_gen(
@@ -78,7 +88,7 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
     secp256k1_frost_secnonce *secnonce,
     secp256k1_frost_pubnonce *pubnonce,
     const unsigned char *session_id32,
-    uint16_t my_index,
+    uint16_t index,
     const secp256k1_frost_share *agg_share,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
@@ -119,22 +129,8 @@ SECP256K1_API int secp256k1_frost_partial_sig_agg(
     uint16_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
-/* TODO: more serialization APIs */
-
-SECP256K1_API int secp256k1_frost_pubnonce_serialize(
-    const secp256k1_context* ctx,
-    unsigned char *out66,
-    const secp256k1_frost_pubnonce* nonce
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
-
-SECP256K1_API int secp256k1_frost_aggnonce_serialize(
-    const secp256k1_context* ctx,
-    unsigned char *out66,
-    const secp256k1_frost_aggnonce* nonce
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
-
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* SECP256K1_FROST_H */
+#endif
