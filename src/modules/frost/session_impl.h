@@ -241,7 +241,7 @@ static void secp256k1_nonce_function_frost(secp256k1_scalar *k, const unsigned c
     }
 }
 
-int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secnonce *secnonce, secp256k1_frost_pubnonce *pubnonce, const unsigned char *session_id32, uint16_t my_index, const secp256k1_frost_share *agg_share, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
+int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secnonce *secnonce, secp256k1_frost_pubnonce *pubnonce, const unsigned char *session_id32, uint16_t idx, const secp256k1_frost_share *agg_share, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
     secp256k1_scalar k[2];
     secp256k1_ge nonce_pt[2];
     int i;
@@ -297,7 +297,7 @@ int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secn
         secp256k1_scalar_clear(&k[i]);
     }
     /* nonce_pt won't be infinity because k != 0 with overwhelming probability */
-    secp256k1_frost_pubnonce_save(pubnonce, nonce_pt, my_index);
+    secp256k1_frost_pubnonce_save(pubnonce, nonce_pt, idx);
     return ret;
 }
 

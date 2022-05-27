@@ -80,7 +80,7 @@ SECP256K1_API int secp256k1_frost_share_agg(
     const secp256k1_pubkey * const* pubcoeffs,
     uint16_t n_shares,
     uint16_t threshold,
-    uint16_t index
+    uint16_t idx
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 SECP256K1_API int secp256k1_frost_nonce_gen(
@@ -88,7 +88,7 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
     secp256k1_frost_secnonce *secnonce,
     secp256k1_frost_pubnonce *pubnonce,
     const unsigned char *session_id32,
-    uint16_t index,
+    uint16_t idx,
     const secp256k1_frost_share *agg_share,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
