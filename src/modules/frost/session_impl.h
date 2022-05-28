@@ -7,7 +7,16 @@
 #ifndef SECP256K1_MODULE_FROST_SESSION_IMPL_H
 #define SECP256K1_MODULE_FROST_SESSION_IMPL_H
 
+#include <string.h>
+
 #include "session.h"
+#include "../../eckey.h"
+#include "../../ecmult.h"
+#include "../../field.h"
+#include "../../group.h"
+#include "../../hash.h"
+#include "../../scalar.h"
+#include "../../util.h"
 
 static const unsigned char secp256k1_frost_secnonce_magic[4] = { 0x84, 0x7d, 0x46, 0x25 };
 

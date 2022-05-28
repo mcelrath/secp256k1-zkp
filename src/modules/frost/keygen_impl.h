@@ -8,6 +8,11 @@
 #define SECP256K1_MODULE_FROST_KEYGEN_IMPL_H
 
 #include "keygen.h"
+#include "../../ecmult.h"
+#include "../../field.h"
+#include "../../group.h"
+#include "../../scalar.h"
+#include "../../hash.h"
 
 /* Generate polynomial coefficients, coefficient commitments, and shares, from
  * a seed and a secret key. */
