@@ -318,7 +318,7 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
  */
 SECP256K1_API int secp256k1_frost_nonce_agg(
     const secp256k1_context* ctx,
-    secp256k1_frost_aggnonce  *aggnonce,
+    secp256k1_frost_aggnonce *aggnonce,
     const secp256k1_frost_pubnonce * const* pubnonces,
     uint16_t n_pubnonces
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
