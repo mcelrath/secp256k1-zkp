@@ -57,7 +57,6 @@ typedef struct {
     unsigned char data[68];
 } secp256k1_frost_secnonce;
 
-/* TODO: add `frost_pubnonce_parse` */
 /** Opaque data structure that holds a signer's public nonce.
 *
 *  Guaranteed to be 134 bytes in size. It can be safely copied/moved. Serialized
@@ -97,17 +96,43 @@ typedef struct {
     unsigned char data[36];
 } secp256k1_frost_partial_sig;
 
+/** Parse a signer's public nonce.
+ *
+ *  Returns: 1 when the nonce could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   nonce: pointer to a nonce object
+ *  In:     in68: pointer to the 68-byte nonce to be parsed
+ */
+SECP256K1_API int secp256k1_frost_pubnonce_parse(
+    const secp256k1_context* ctx,
+    secp256k1_frost_pubnonce* nonce,
+    const unsigned char *in68
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
 /** Serialize a signer's public nonce
  *
  *  Returns: 1 when the nonce could be serialized, 0 otherwise
  *  Args:    ctx: a secp256k1 context object
- *  Out:   out66: pointer to a 66-byte array to store the serialized nonce
+ *  Out:   out68: pointer to a 68-byte array to store the serialized nonce
  *  In:    nonce: pointer to the nonce
  */
 SECP256K1_API int secp256k1_frost_pubnonce_serialize(
     const secp256k1_context* ctx,
-    unsigned char *out66,
+    unsigned char *out68,
     const secp256k1_frost_pubnonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Parse an aggregate public nonce.
+ *
+ *  Returns: 1 when the nonce could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   nonce: pointer to a nonce object
+ *  In:     in66: pointer to the 66-byte nonce to be parsed
+ */
+SECP256K1_API int secp256k1_frost_aggnonce_parse(
+    const secp256k1_context* ctx,
+    secp256k1_frost_aggnonce* nonce,
+    const unsigned char *in66
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Serialize an aggregate public nonce
@@ -121,6 +146,36 @@ SECP256K1_API int secp256k1_frost_aggnonce_serialize(
     const secp256k1_context* ctx,
     unsigned char *out66,
     const secp256k1_frost_aggnonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Serialize a FROST partial signature
+ *
+ *  Returns: 1 when the signature could be serialized, 0 otherwise
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   out32: pointer to a 32-byte array to store the serialized signature
+ *  In:      sig: pointer to the signature
+ */
+SECP256K1_API int secp256k1_frost_partial_sig_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out32,
+    const secp256k1_frost_partial_sig* sig
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Parse a FROST partial signature.
+ *
+ *  Returns: 1 when the signature could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:     sig: pointer to a signature object
+ *  In:     in32: pointer to the 32-byte signature to be parsed
+ *
+ *  After the call, sig will always be initialized. If parsing failed or the
+ *  encoded numbers are out of range, signature verification with it is
+ *  guaranteed to fail for every message and public key.
+ */
+SECP256K1_API int secp256k1_frost_partial_sig_parse(
+    const secp256k1_context* ctx,
+    secp256k1_frost_partial_sig* sig,
+    const unsigned char *in32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Derives polynomial shares and their coefficient commitments
