@@ -152,16 +152,16 @@ SECP256K1_API int secp256k1_frost_share_gen(
 
 /** Aggregates shares
  *
- * As part of the key generation protocol, each participant receives a shares
- * from each participant, including a share they "receive" from themselves.
- * This function verifies those shares against their verifiable secret sharing
- * ("VSS") commitments, aggregates the shares, and then aggregates the
- * commitments to each participants first polynomial coefficient to derive the
- * aggregate public key.
+ *  As part of the key generation protocol, each participant receives a share
+ *  from each participant, including a share they "receive" from themselves.
+ *  This function verifies those shares against their verifiable secret sharing
+ *  ("VSS") commitments, aggregates the shares, and then aggregates the
+ *  commitments to each participant's first polynomial coefficient to derive
+ *  the aggregate public key.
  *
- * This function outputs a vss_hash, which is a sha256 image of coefficient
- * commitments of all participants. pubcoeffs must be sorted by participant
- * index, otherwise the vss_hash generated will be invalid.
+ *  This function outputs a vss_hash, which is a sha256 image of coefficient
+ *  commitments of all participants. pubcoeffs must be sorted by participant
+ *  index, otherwise the vss_hash generated will be invalid.
  *
  *  Returns: 0 if the arguments are invalid, 1 otherwise (which does NOT mean
  *           the resulting signature verifies).
