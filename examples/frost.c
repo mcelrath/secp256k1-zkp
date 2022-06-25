@@ -31,7 +31,7 @@ struct signer {
     secp256k1_xonly_pubkey pubkey;
     secp256k1_frost_pubnonce pubnonce;
     secp256k1_frost_partial_sig partial_sig;
-    secp256k1_pubkey pubcoeff[THRESHOLD];
+    secp256k1_pubkey vss_commitment[THRESHOLD];
     unsigned char vss_hash[32];
 };
 
@@ -67,10 +67,10 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
 
     for (i = 0; i < N_SIGNERS; i++) {
         /* Generate a polynomial share for each participant */
-        if (!secp256k1_frost_share_gen(ctx, signer[i].pubcoeff, shares[i], THRESHOLD, N_SIGNERS, &signer_secrets[i].keypair)) {
+        if (!secp256k1_frost_share_gen(ctx, signer[i].vss_commitment, shares[i], THRESHOLD, N_SIGNERS, &signer_secrets[i].keypair)) {
             return 0;
         }
-        pubcoeffs[i] = signer[i].pubcoeff;
+        pubcoeffs[i] = signer[i].vss_commitment;
     }
 
     /* KeyGen communication round 1: exchange shares, nonce commitments, and

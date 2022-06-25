@@ -16,7 +16,7 @@
 
 /* Generate polynomial coefficients, coefficient commitments, and shares, from
  * a seed and a secret key. */
-static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const unsigned char *seckey32) {
+static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const unsigned char *seckey32) {
     secp256k1_sha256 sha;
     uint16_t i;
     int overflow;
@@ -43,7 +43,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
     }
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &const_term);
     secp256k1_ge_set_gej(&rp, &rj);
-    secp256k1_pubkey_save(&pubcoeff[0], &rp);
+    secp256k1_pubkey_save(&vss_commitment[0], &rp);
 
     /* Derive coefficients from the seed */
     for (i = 0; i < threshold - 1; i++) {
@@ -55,7 +55,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
         /* Compute commitment to each coefficient */
         secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &rand[i % 2]);
         secp256k1_ge_set_gej(&rp, &rj);
-        secp256k1_pubkey_save(&pubcoeff[threshold - i - 1], &rp);
+        secp256k1_pubkey_save(&vss_commitment[threshold - i - 1], &rp);
     }
 
     for (i = 0; i < n_participants; i++) {
@@ -83,14 +83,14 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
 }
 
 /* TODO: add optional aux data */
-int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pubcoeff, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const secp256k1_keypair *keypair) {
+int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const secp256k1_keypair *keypair) {
     secp256k1_scalar sk;
     secp256k1_ge pk;
     unsigned char buf[32];
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    ARG_CHECK(pubcoeff != NULL);
+    ARG_CHECK(vss_commitment != NULL);
     ARG_CHECK(shares != NULL);
     ARG_CHECK(n_participants > 0);
     ARG_CHECK(keypair != NULL);
@@ -104,7 +104,7 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *pu
     }
     secp256k1_scalar_get_b32(buf, &sk);
 
-    if (!secp256k1_frost_share_gen_internal(ctx, pubcoeff, shares, threshold, n_participants, buf)) {
+    if (!secp256k1_frost_share_gen_internal(ctx, vss_commitment, shares, threshold, n_participants, buf)) {
         return 0;
     }
 
@@ -152,7 +152,7 @@ typedef struct {
     const secp256k1_context *ctx;
     secp256k1_scalar idx;
     secp256k1_scalar idxn;
-    const secp256k1_pubkey * const* pubcoeff;
+    const secp256k1_pubkey * const* vss_commitment;
 } secp256k1_frost_verify_share_ecmult_data;
 
 typedef struct {
@@ -165,7 +165,7 @@ static int secp256k1_frost_verify_share_ecmult_callback(secp256k1_scalar *sc, se
     secp256k1_frost_verify_share_ecmult_data *ctx = (secp256k1_frost_verify_share_ecmult_data *) data;
     int ret;
 
-    ret = secp256k1_pubkey_load(ctx->ctx, pt, *(ctx->pubcoeff)+idx);
+    ret = secp256k1_pubkey_load(ctx->ctx, pt, *(ctx->vss_commitment)+idx);
     VERIFY_CHECK(ret);
     *sc = ctx->idxn;
     secp256k1_scalar_mul(&ctx->idxn, &ctx->idxn, &ctx->idx);
@@ -191,7 +191,7 @@ static int vss_verify(const secp256k1_context* ctx, uint16_t threshold, uint16_t
      *                   + ...
      *                   + idx^(threshold - 1)*vss_commitment[threshold - 1]*/
     verify_share_ecmult_data.ctx = ctx;
-    verify_share_ecmult_data.pubcoeff = vss_commitment;
+    verify_share_ecmult_data.vss_commitment = vss_commitment;
     /* Evaluate the public polynomial at the idx */
     secp256k1_scalar_set_int(&verify_share_ecmult_data.idx, idx);
     secp256k1_scalar_set_int(&verify_share_ecmult_data.idxn, 1);

@@ -186,19 +186,19 @@ SECP256K1_API int secp256k1_frost_partial_sig_parse(
  *
  *  Returns: 0 if the arguments are invalid, 1 otherwise
  *  Args:        ctx: pointer to a context object initialized for verification
- *  Out:    pubcoeff: the coefficient commitments. The length of this array
- *                    should be equal to the threshold.
- *            shares: the polynomial shares. The length of this array should be
- *                    equal to n_participants.
- *   In:   threshold: the minimum number of shares required to produce a
- *                    signature
- *    n_participants: the total number of shares to be generated
- *           keypair: pointer to a keypair used to generate the polynomial that
- *                    derives the shares
+ *  Out:    vss_commitment: the coefficient commitments. The length of this
+ *                          array should be equal to the threshold.
+ *                  shares: the polynomial shares. The length of this array
+ *                          should be equal to n_participants.
+ *   In:         threshold: the minimum number of shares required to produce a
+ *                          signature
+ *          n_participants: the total number of shares to be generated
+ *                 keypair: pointer to a keypair used to generate the
+ *                          polynomial that derives the shares
  */
 SECP256K1_API int secp256k1_frost_share_gen(
     const secp256k1_context *ctx,
-    secp256k1_pubkey *pubcoeff,
+    secp256k1_pubkey *vss_commitment,
     secp256k1_frost_share *shares,
     uint16_t threshold,
     uint16_t n_participants,
