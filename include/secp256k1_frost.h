@@ -300,29 +300,6 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
     const unsigned char *extra_input32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
-/** Aggregates the nonces of all signers into a single nonce
- *
- *  This can be done by an untrusted party to reduce the communication
- *  between signers. Instead of everyone sending nonces to everyone else, there
- *  can be one party receiving all nonces, aggregating the nonces with this
- *  function and then sending only the aggregate nonce back to the signers.
- *
- *  Returns: 0 if the arguments are invalid, 1 otherwise
- *  Args:           ctx: pointer to a context object
- *  Out:       aggnonce: pointer to an aggregate public nonce object for
- *                       frost_nonce_process
- *  In:       pubnonces: array of pointers to public nonces sent by the
- *                       signers
- *          n_pubnonces: number of elements in the pubnonces array. Must be
- *                       greater than 0.
- */
-SECP256K1_API int secp256k1_frost_nonce_agg(
-    const secp256k1_context* ctx,
-    secp256k1_frost_aggnonce *aggnonce,
-    const secp256k1_frost_pubnonce * const* pubnonces,
-    uint16_t n_pubnonces
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
-
 /** Takes the public nonces of all signers and computes a session that is
  *  required for signing and verification of partial signatures.
  *
@@ -331,9 +308,7 @@ SECP256K1_API int secp256k1_frost_nonce_agg(
  *  Args:          ctx: pointer to a context object, initialized for
  *                      verification
  *  Out:       session: pointer to a struct to store the session
- *  In:       aggnonce: pointer to an aggregate public nonce object that is the
- *                      output of frost_nonce_agg
- *           pubnonces: array of pointers to public nonces sent by the signers
+ *  In:      pubnonces: array of pointers to public nonces sent by the signers
  *         n_pubnonces: number of elements in the pubnonces array. Must be
  *                      greater than 0.
  *               msg32: the 32-byte message to sign
@@ -344,13 +319,12 @@ SECP256K1_API int secp256k1_frost_nonce_agg(
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_nonce_process(
     const secp256k1_context* ctx,
     secp256k1_frost_session *session,
-    const secp256k1_frost_aggnonce  *aggnonce,
     const secp256k1_frost_pubnonce * const* pubnonces,
     uint16_t n_pubnonces,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
     uint16_t idx
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 /** Produces a partial signature
  *

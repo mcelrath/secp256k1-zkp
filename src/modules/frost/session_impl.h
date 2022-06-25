@@ -400,44 +400,6 @@ static int secp256k1_frost_sum_nonces(const secp256k1_context* ctx, secp256k1_ge
     return 1;
 }
 
-int secp256k1_frost_nonce_agg(const secp256k1_context* ctx, secp256k1_frost_aggnonce  *aggnonce, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces) {
-    secp256k1_gej aggnonce_ptj[2];
-    secp256k1_ge aggnonce_pt[2];
-    int i;
-    VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(aggnonce != NULL);
-    ARG_CHECK(pubnonces != NULL);
-    ARG_CHECK(n_pubnonces > 0);
-
-    if (!secp256k1_frost_sum_nonces(ctx, aggnonce_ptj, pubnonces, n_pubnonces)) {
-        return 0;
-    }
-    for (i = 0; i < 2; i++) {
-        if (secp256k1_gej_is_infinity(&aggnonce_ptj[i])) {
-            /* There must be at least one dishonest signer. If we would return 0
-               here, we will never be able to determine who it is. Therefore, we
-               should continue such that the culprit is revealed when collecting
-               and verifying partial signatures.
-
-               However, dealing with the point at infinity (loading,
-               de-/serializing) would require a lot of extra code complexity.
-               Instead, we set the aggregate nonce to some arbitrary point (the
-               generator). This is secure, because it only restricts the
-               abilities of the attacker: an attacker that forces the sum of
-               nonces to be infinity by sending some maliciously generated nonce
-               pairs can be turned into an attacker that forces the sum to be
-               the generator (by simply adding the generator to one of the
-               malicious nonces), and this does not change the winning condition
-               of the EUF-CMA game. */
-            aggnonce_pt[i] = secp256k1_ge_const_g;
-        } else {
-            secp256k1_ge_set_gej(&aggnonce_pt[i], &aggnonce_ptj[i]);
-        }
-    }
-    secp256k1_frost_aggnonce_save(aggnonce, aggnonce_pt);
-    return 1;
-}
-
 /* Implements binding factor from draft-irtf-cfrg-frost-04, section 4.4. */
 static int secp256k1_frost_compute_noncehash(const secp256k1_context* ctx, unsigned char *noncehash, const unsigned char *msg, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces) {
     unsigned char buf[68];
@@ -516,27 +478,49 @@ static void secp256k1_frost_lagrange_coefficient(secp256k1_scalar *r, const secp
     secp256k1_scalar_mul(r, &num, &den);
 }
 
-int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_session *session, const secp256k1_frost_aggnonce *aggnonce, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, uint16_t idx) {
+int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_session *session, const secp256k1_frost_pubnonce * const* pubnonces, uint16_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, uint16_t idx) {
     secp256k1_ge aggnonce_pt[2];
     secp256k1_gej aggnonce_ptj[2];
     unsigned char fin_nonce[32];
     secp256k1_frost_session_internal session_i;
     unsigned char agg_pk32[32];
+    int i;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(session != NULL);
-    ARG_CHECK(aggnonce != NULL);
     ARG_CHECK(msg32 != NULL);
+    ARG_CHECK(pubnonces != NULL);
+    ARG_CHECK(n_pubnonces > 1);
 
     if (!secp256k1_xonly_pubkey_serialize(ctx, agg_pk32, agg_pk)) {
         return 0;
     }
 
-    if (!secp256k1_frost_aggnonce_load(ctx, aggnonce_pt, aggnonce)) {
+    if (!secp256k1_frost_sum_nonces(ctx, aggnonce_ptj, pubnonces, n_pubnonces)) {
         return 0;
     }
-    secp256k1_gej_set_ge(&aggnonce_ptj[0], &aggnonce_pt[0]);
-    secp256k1_gej_set_ge(&aggnonce_ptj[1], &aggnonce_pt[1]);
+    for (i = 0; i < 2; i++) {
+        if (secp256k1_gej_is_infinity(&aggnonce_ptj[i])) {
+            /* There must be at least one dishonest signer. If we would return 0
+               here, we will never be able to determine who it is. Therefore, we
+               should continue such that the culprit is revealed when collecting
+               and verifying partial signatures.
+
+               However, dealing with the point at infinity (loading,
+               de-/serializing) would require a lot of extra code complexity.
+               Instead, we set the aggregate nonce to some arbitrary point (the
+               generator). This is secure, because it only restricts the
+               abilities of the attacker: an attacker that forces the sum of
+               nonces to be infinity by sending some maliciously generated nonce
+               pairs can be turned into an attacker that forces the sum to be
+               the generator (by simply adding the generator to one of the
+               malicious nonces), and this does not change the winning condition
+               of the EUF-CMA game. */
+            aggnonce_pt[i] = secp256k1_ge_const_g;
+        } else {
+            secp256k1_ge_set_gej(&aggnonce_pt[i], &aggnonce_ptj[i]);
+        }
+    }
     if (!secp256k1_frost_nonce_process_internal(ctx, &session_i.fin_nonce_parity, fin_nonce, &session_i.noncecoef, aggnonce_ptj, msg32, pubnonces, n_pubnonces)) {
         return 0;
     }
