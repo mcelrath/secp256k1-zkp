@@ -14,40 +14,51 @@
 #include "../../scalar.h"
 #include "../../hash.h"
 
-/* Generate polynomial coefficients, coefficient commitments, and shares, from
- * a seed and a secret key. */
-static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const unsigned char *seckey32) {
+/* TODO: add optional aux data */
+/* TODO: add session ID */
+/* Generate polynomial coefficients, coefficient commitments, and a share, from */
+/* a seed and a secret key. */
+int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const secp256k1_keypair *keypair) {
     secp256k1_sha256 sha;
-    uint16_t i;
-    int overflow;
-    secp256k1_scalar const_term;
-    secp256k1_gej rj;
-    secp256k1_ge rp;
+    secp256k1_scalar sk;
+    secp256k1_ge ge_tmp;
+    unsigned char buf[32];
     unsigned char rngseed[32];
+    uint16_t i;
 
-    ARG_CHECK(seckey32 != NULL);
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    ARG_CHECK(vss_commitment != NULL);
+    ARG_CHECK(shares != NULL);
+    ARG_CHECK(threshold > 1);
+    ARG_CHECK(n_participants > 1);
+    ARG_CHECK(keypair != NULL);
 
+    if (threshold > n_participants) {
+        return 0;
+    }
+
+    if (!secp256k1_keypair_load(ctx, &sk, &ge_tmp, keypair)) {
+        return 0;
+    }
+    /* The first coefficient is the secret key, and thus the first commitment */
+    /* is the public key. */
+    secp256k1_pubkey_save(&vss_commitment[0], &ge_tmp);
     /* Compute seed which commits to all inputs */
+    secp256k1_scalar_get_b32(buf, &sk);
     secp256k1_sha256_initialize(&sha);
-    secp256k1_sha256_write(&sha, seckey32, 32);
+    secp256k1_sha256_write(&sha, buf, 32);
     for (i = 0; i < 8; i++) {
         rngseed[i + 0] = threshold / (1ull << (i * 8));
         rngseed[i + 8] = n_participants / (1ull << (i * 8));
     }
     secp256k1_sha256_write(&sha, rngseed, 16);
     secp256k1_sha256_finalize(&sha, rngseed);
-
-    secp256k1_scalar_set_b32(&const_term, seckey32, &overflow);
-    if (overflow) {
-        return 0;
-    }
-    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &const_term);
-    secp256k1_ge_set_gej(&rp, &rj);
-    secp256k1_pubkey_save(&vss_commitment[0], &rp);
-
     /* Derive coefficients from the seed */
     for (i = 0; i < threshold - 1; i++) {
         secp256k1_scalar rand[2];
+        secp256k1_gej rj;
+        secp256k1_ge rp;
 
         if (i % 2 == 0) {
             secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, i);
@@ -57,7 +68,7 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
         secp256k1_ge_set_gej(&rp, &rj);
         secp256k1_pubkey_save(&vss_commitment[threshold - i - 1], &rp);
     }
-
+    /* Derive shares */
     for (i = 0; i < n_participants; i++) {
         uint16_t j;
         secp256k1_scalar share_i;
@@ -75,37 +86,8 @@ static int secp256k1_frost_share_gen_internal(const secp256k1_context *ctx, secp
             secp256k1_scalar_add(&share_i, &share_i, &rand[j % 2]);
             secp256k1_scalar_mul(&share_i, &share_i, &scalar_i);
         }
-        secp256k1_scalar_add(&share_i, &share_i, &const_term);
+        secp256k1_scalar_add(&share_i, &share_i, &sk);
         secp256k1_scalar_get_b32(shares[i].data, &share_i);
-    }
-
-    return 1;
-}
-
-/* TODO: add optional aux data */
-int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const secp256k1_keypair *keypair) {
-    secp256k1_scalar sk;
-    secp256k1_ge pk;
-    unsigned char buf[32];
-
-    VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    ARG_CHECK(vss_commitment != NULL);
-    ARG_CHECK(shares != NULL);
-    ARG_CHECK(n_participants > 0);
-    ARG_CHECK(keypair != NULL);
-
-    if (threshold == 0 || threshold > n_participants) {
-        return 0;
-    }
-
-    if (!secp256k1_keypair_load(ctx, &sk, &pk, keypair)) {
-        return 0;
-    }
-    secp256k1_scalar_get_b32(buf, &sk);
-
-    if (!secp256k1_frost_share_gen_internal(ctx, vss_commitment, shares, threshold, n_participants, buf)) {
-        return 0;
     }
 
     return 1;
