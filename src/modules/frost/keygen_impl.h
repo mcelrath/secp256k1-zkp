@@ -14,7 +14,6 @@
 #include "../../scalar.h"
 #include "../../hash.h"
 
-/* TODO: add optional aux data */
 /* TODO: add session ID */
 /* Generate polynomial coefficients, coefficient commitments, and a share, from */
 /* a seed and a secret key. */
@@ -41,8 +40,8 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
     if (!secp256k1_keypair_load(ctx, &sk, &ge_tmp, keypair)) {
         return 0;
     }
-    /* The first coefficient is the secret key, and thus the first commitment */
-    /* is the public key. */
+    /* The first coefficient is the secret key, and thus the first commitment
+     * is the public key. */
     secp256k1_pubkey_save(&vss_commitment[0], &ge_tmp);
     /* Compute seed which commits to all inputs */
     secp256k1_scalar_get_b32(buf, &sk);
@@ -200,10 +199,11 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     ARG_CHECK(vss_hash != NULL);
     ARG_CHECK(shares != NULL);
     ARG_CHECK(vss_commitments != NULL);
-    ARG_CHECK(n_shares > 0);
+    ARG_CHECK(n_shares > 1);
     ARG_CHECK(idx > 0);
+    ARG_CHECK(threshold > 1);
 
-    if (threshold == 0 || threshold > n_shares) {
+    if (threshold > n_shares) {
         return 0;
     }
 

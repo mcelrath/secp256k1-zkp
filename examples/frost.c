@@ -63,14 +63,14 @@ int create_keypair(const secp256k1_context* ctx, struct signer_secrets *signer_s
 int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, secp256k1_xonly_pubkey *agg_pk) {
     int i;
     secp256k1_frost_share shares[N_SIGNERS][N_SIGNERS];
-    const secp256k1_pubkey *pubcoeffs[N_SIGNERS];
+    const secp256k1_pubkey *vss_commitments[N_SIGNERS];
 
     for (i = 0; i < N_SIGNERS; i++) {
         /* Generate a polynomial share for each participant */
         if (!secp256k1_frost_share_gen(ctx, signer[i].vss_commitment, shares[i], THRESHOLD, N_SIGNERS, &signer_secrets[i].keypair)) {
             return 0;
         }
-        pubcoeffs[i] = signer[i].vss_commitment;
+        vss_commitments[i] = signer[i].vss_commitment;
     }
 
     /* KeyGen communication round 1: exchange shares, nonce commitments, and
@@ -85,7 +85,7 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
             assigned_shares[j] = &shares[j][i];
         }
         /* Each participant aggregates the shares they received. */
-        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, agg_pk, signer[i].vss_hash, assigned_shares, pubcoeffs, N_SIGNERS, THRESHOLD, i+1)) {
+        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, agg_pk, signer[i].vss_hash, assigned_shares, vss_commitments, N_SIGNERS, THRESHOLD, i+1)) {
             return 0;
         }
     }
@@ -149,7 +149,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         }
         /* Initialize session and create secret nonce for signing and public
          * nonce to send to the other signers. */
-        if (!secp256k1_frost_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, i+1, &signer_secrets[i].agg_share, msg32, NULL, NULL)) {
+        if (!secp256k1_frost_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, i+1, &signer_secrets[i].agg_share, msg32, agg_pk, NULL)) {
             return 0;
         }
         pubnonces[i] = &signer[i].pubnonce;

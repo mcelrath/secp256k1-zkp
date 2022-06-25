@@ -215,7 +215,7 @@ SECP256K1_API int secp256k1_frost_share_gen(
  *  the aggregate public key.
  *
  *  This function outputs a vss_hash, which is a sha256 image of coefficient
- *  commitments of all participants. pubcoeffs must be sorted by participant
+ *  commitments of all participants. vss_commitments must be sorted by participant
  *  index, otherwise the vss_hash generated will be invalid.
  *
  *  Returns: 0 if the arguments are invalid, 1 otherwise (which does NOT mean
@@ -225,7 +225,7 @@ SECP256K1_API int secp256k1_frost_share_gen(
  *             agg_pk: the aggregated x-only public key
  *           vss_hash: sha256 image of the coefficient commitments
  *  In:        shares: all polynomial shares for the partcipant's index
- *          pubcoeffs: coefficient commitments of all participants ordered by
+ *          vss_commitments: coefficient commitments of all participants ordered by
  *                     index
  *           n_shares: the total number of shares
  *          threshold: the minimum number of shares required to produce a
@@ -239,7 +239,7 @@ SECP256K1_API int secp256k1_frost_share_agg(
     secp256k1_xonly_pubkey *agg_pk,
     unsigned char *vss_hash,
     const secp256k1_frost_share * const* shares,
-    const secp256k1_pubkey * const* pubcoeffs,
+    const secp256k1_pubkey * const* vss_commitments,
     uint16_t n_shares,
     uint16_t threshold,
     uint16_t idx
