@@ -87,6 +87,7 @@ static const unsigned char secp256k1_frost_session_cache_magic[4] = { 0x9d, 0xed
  * - 32 byte nonce coefficient b
  * - 32 byte signature challenge hash e
  * - 32 byte scalar s that is added to the partial signatures of the signers
+ * - 32 byte lagrange coefficient l
  */
 static void secp256k1_frost_session_save(secp256k1_frost_session *session, const secp256k1_frost_session_internal *session_i) {
     unsigned char *ptr = session->data;
@@ -102,6 +103,8 @@ static void secp256k1_frost_session_save(secp256k1_frost_session *session, const
     secp256k1_scalar_get_b32(ptr, &session_i->challenge);
     ptr += 32;
     secp256k1_scalar_get_b32(ptr, &session_i->s_part);
+    ptr += 32;
+    secp256k1_scalar_get_b32(ptr, &session_i->lagrange);
 }
 
 static int secp256k1_frost_session_load(const secp256k1_context* ctx, secp256k1_frost_session_internal *session_i, const secp256k1_frost_session *session) {
@@ -118,6 +121,8 @@ static int secp256k1_frost_session_load(const secp256k1_context* ctx, secp256k1_
     secp256k1_scalar_set_b32(&session_i->challenge, ptr, NULL);
     ptr += 32;
     secp256k1_scalar_set_b32(&session_i->s_part, ptr, NULL);
+    ptr += 32;
+    secp256k1_scalar_set_b32(&session_i->lagrange, ptr, NULL);
     return 1;
 }
 
@@ -517,7 +522,6 @@ int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_
     unsigned char fin_nonce[32];
     secp256k1_frost_session_internal session_i;
     unsigned char agg_pk32[32];
-    secp256k1_scalar l;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(session != NULL);
@@ -538,8 +542,7 @@ int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_
     }
 
     secp256k1_schnorrsig_challenge(&session_i.challenge, fin_nonce, msg32, 32, agg_pk32);
-    secp256k1_frost_lagrange_coefficient(&l, pubnonces, n_pubnonces, idx);
-    secp256k1_scalar_mul(&session_i.challenge, &session_i.challenge, &l);
+    secp256k1_frost_lagrange_coefficient(&session_i.lagrange, pubnonces, n_pubnonces, idx);
     secp256k1_scalar_set_int(&session_i.s_part, 0);
     memcpy(session_i.fin_nonce, fin_nonce, sizeof(session_i.fin_nonce));
     secp256k1_frost_session_save(session, &session_i);
@@ -592,6 +595,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
     }
 
     /* Sign */
+    secp256k1_scalar_mul(&session_i.challenge, &session_i.challenge, &session_i.lagrange);
     secp256k1_scalar_mul(&s, &session_i.challenge, &sk);
     secp256k1_scalar_mul(&k[1], &session_i.noncecoef, &k[1]);
     secp256k1_scalar_add(&k[0], &k[0], &k[1]);
