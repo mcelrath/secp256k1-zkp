@@ -185,7 +185,7 @@ static int vss_verify(const secp256k1_context* ctx, uint16_t threshold, uint16_t
     return secp256k1_gej_is_infinity(&tmpj);
 }
 
-int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* pubcoeffs, uint16_t n_shares, uint16_t threshold, uint16_t idx) {
+int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* vss_commitments, uint16_t n_shares, uint16_t threshold, uint16_t idx) {
     secp256k1_frost_pubkey_combine_ecmult_data pubkey_combine_ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
@@ -199,7 +199,7 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     ARG_CHECK(agg_pk != NULL);
     ARG_CHECK(vss_hash != NULL);
     ARG_CHECK(shares != NULL);
-    ARG_CHECK(pubcoeffs != NULL);
+    ARG_CHECK(vss_commitments != NULL);
     ARG_CHECK(n_shares > 0);
     ARG_CHECK(idx > 0);
 
@@ -215,18 +215,18 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
         if (overflow) {
             return 0;
         }
-        if (!vss_verify(ctx, threshold, idx, &share_i, &pubcoeffs[i])) {
+        if (!vss_verify(ctx, threshold, idx, &share_i, &vss_commitments[i])) {
             return 0;
         }
         secp256k1_scalar_add(&acc, &acc, &share_i);
     }
-    if (!secp256k1_frost_compute_vss_hash(ctx, vss_hash, pubcoeffs, n_shares, threshold)) {
+    if (!secp256k1_frost_compute_vss_hash(ctx, vss_hash, vss_commitments, n_shares, threshold)) {
         return 0;
     }
 
     /* Combine pubkeys */
     pubkey_combine_ecmult_data.ctx = ctx;
-    pubkey_combine_ecmult_data.pks = pubcoeffs;
+    pubkey_combine_ecmult_data.pks = vss_commitments;
     pubkey_combine_ecmult_data.threshold = threshold;
 
     /* TODO: add scratch */
