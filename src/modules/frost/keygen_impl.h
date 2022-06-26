@@ -15,27 +15,28 @@
 #include "../../hash.h"
 
 /* TODO: add session ID */
+/* TODO: make vss_commitment optional */
 /* Generate polynomial coefficients, coefficient commitments, and a share, from */
 /* a seed and a secret key. */
-int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *shares, uint16_t threshold, uint16_t n_participants, const secp256k1_keypair *keypair) {
+int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *share, const secp256k1_keypair *keypair, const secp256k1_xonly_pubkey *pk, size_t threshold) {
     secp256k1_sha256 sha;
+    secp256k1_scalar idx;
     secp256k1_scalar sk;
+    secp256k1_scalar share_i;
     secp256k1_ge ge_tmp;
     unsigned char buf[32];
     unsigned char rngseed[32];
-    uint16_t i;
+    secp256k1_scalar rand[2];
+    size_t i;
+    int overflow;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    ARG_CHECK(vss_commitment != NULL);
-    ARG_CHECK(shares != NULL);
+    VERIFY_CHECK(vss_commitment != NULL);
+    VERIFY_CHECK(share != NULL);
+    VERIFY_CHECK(keypair != NULL);
+    VERIFY_CHECK(pk != NULL);
     ARG_CHECK(threshold > 1);
-    ARG_CHECK(n_participants > 1);
-    ARG_CHECK(keypair != NULL);
-
-    if (threshold > n_participants) {
-        return 0;
-    }
 
     if (!secp256k1_keypair_load(ctx, &sk, &ge_tmp, keypair)) {
         return 0;
@@ -49,13 +50,11 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
     secp256k1_sha256_write(&sha, buf, 32);
     for (i = 0; i < 8; i++) {
         rngseed[i + 0] = threshold / (1ull << (i * 8));
-        rngseed[i + 8] = n_participants / (1ull << (i * 8));
     }
-    secp256k1_sha256_write(&sha, rngseed, 16);
+    secp256k1_sha256_write(&sha, rngseed, 8);
     secp256k1_sha256_finalize(&sha, rngseed);
     /* Derive coefficients from the seed */
     for (i = 0; i < threshold - 1; i++) {
-        secp256k1_scalar rand[2];
         secp256k1_gej rj;
         secp256k1_ge rp;
 
@@ -67,27 +66,26 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
         secp256k1_ge_set_gej(&rp, &rj);
         secp256k1_pubkey_save(&vss_commitment[threshold - i - 1], &rp);
     }
-    /* Derive shares */
-    for (i = 0; i < n_participants; i++) {
-        uint16_t j;
-        secp256k1_scalar share_i;
-        secp256k1_scalar scalar_i;
-        secp256k1_scalar rand[2];
-
-        secp256k1_scalar_clear(&share_i);
-        secp256k1_scalar_set_int(&scalar_i, i + 1);
-        for (j = 0; j < threshold - 1; j++) {
-            if (j % 2 == 0) {
-                secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, j);
-            }
-
-            /* Horner's method to evaluate polynomial to derive shares */
-            secp256k1_scalar_add(&share_i, &share_i, &rand[j % 2]);
-            secp256k1_scalar_mul(&share_i, &share_i, &scalar_i);
-        }
-        secp256k1_scalar_add(&share_i, &share_i, &sk);
-        secp256k1_scalar_get_b32(shares[i].data, &share_i);
+    /* Derive share */
+    secp256k1_scalar_clear(&share_i);
+    if (!secp256k1_xonly_pubkey_serialize(ctx, buf, pk)) {
+        return 0;
     }
+    secp256k1_scalar_set_b32(&idx, buf, &overflow);
+    if (overflow) {
+        return 0;
+    }
+    for (i = 0; i < threshold - 1; i++) {
+        if (i % 2 == 0) {
+            secp256k1_scalar_chacha20(&rand[0], &rand[1], rngseed, i);
+        }
+
+        /* Horner's method to evaluate polynomial to derive shares */
+        secp256k1_scalar_add(&share_i, &share_i, &rand[i % 2]);
+        secp256k1_scalar_mul(&share_i, &share_i, &idx);
+    }
+    secp256k1_scalar_add(&share_i, &share_i, &sk);
+    secp256k1_scalar_get_b32(share->data, &share_i);
 
     return 1;
 }
@@ -109,9 +107,9 @@ static void secp256k1_frost_vsslist_sha256(secp256k1_sha256 *sha) {
 }
 
 /* Computes vss_hash = tagged_hash(pk[0], ..., pk[np-1]) */
-static int secp256k1_frost_compute_vss_hash(const secp256k1_context *ctx, unsigned char *vss_hash, const secp256k1_pubkey * const* pk, uint16_t np, uint16_t t) {
+static int secp256k1_frost_compute_vss_hash(const secp256k1_context *ctx, unsigned char *vss_hash, const secp256k1_pubkey * const* pk, size_t np, size_t t) {
     secp256k1_sha256 sha;
-    uint16_t i, j;
+    size_t i, j;
     size_t size = 33;
 
     secp256k1_frost_vsslist_sha256(&sha);
@@ -139,7 +137,7 @@ typedef struct {
 typedef struct {
     const secp256k1_context *ctx;
     const secp256k1_pubkey * const* pks;
-    uint16_t threshold;
+    size_t threshold;
 } secp256k1_frost_pubkey_combine_ecmult_data;
 
 static int secp256k1_frost_verify_share_ecmult_callback(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void *data) {
@@ -162,10 +160,12 @@ static int secp256k1_frost_pubkey_combine_callback(secp256k1_scalar *sc, secp256
     return secp256k1_pubkey_load(ctx->ctx, pt, &ctx->pks[idx][0]);
 }
 
-static int vss_verify(const secp256k1_context* ctx, uint16_t threshold, uint16_t idx, const secp256k1_scalar *share, const secp256k1_pubkey * const* vss_commitment) {
+static int vss_verify(const secp256k1_context* ctx, size_t threshold, const secp256k1_xonly_pubkey *pk, const secp256k1_scalar *share, const secp256k1_pubkey * const* vss_commitment) {
     secp256k1_scalar share_neg;
     secp256k1_gej tmpj;
     secp256k1_frost_verify_share_ecmult_data verify_share_ecmult_data;
+    int overflow;
+    unsigned char pk32[32];
 
     /* Use an EC multi-multiplication to verify the following equation:
      *   0 = - share_i*G + idx^0*vss_commitment[0]
@@ -174,7 +174,13 @@ static int vss_verify(const secp256k1_context* ctx, uint16_t threshold, uint16_t
     verify_share_ecmult_data.ctx = ctx;
     verify_share_ecmult_data.vss_commitment = vss_commitment;
     /* Evaluate the public polynomial at the idx */
-    secp256k1_scalar_set_int(&verify_share_ecmult_data.idx, idx);
+     if (!secp256k1_xonly_pubkey_serialize(ctx, pk32, pk)) {
+        return 0;
+    }
+    secp256k1_scalar_set_b32(&verify_share_ecmult_data.idx, pk32, &overflow);
+    if (overflow) {
+        return 0;
+    }
     secp256k1_scalar_set_int(&verify_share_ecmult_data.idxn, 1);
     secp256k1_scalar_negate(&share_neg, share);
     /* TODO: add scratch */
@@ -184,23 +190,22 @@ static int vss_verify(const secp256k1_context* ctx, uint16_t threshold, uint16_t
     return secp256k1_gej_is_infinity(&tmpj);
 }
 
-int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* vss_commitments, uint16_t n_shares, uint16_t threshold, uint16_t idx) {
+int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* vss_commitments, size_t n_shares, size_t threshold, const secp256k1_xonly_pubkey *pk) {
     secp256k1_frost_pubkey_combine_ecmult_data pubkey_combine_ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
     int pk_parity;
     secp256k1_scalar acc;
-    uint16_t i;
+    size_t i;
     int overflow;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(agg_share != NULL);
-    ARG_CHECK(agg_pk != NULL);
-    ARG_CHECK(vss_hash != NULL);
-    ARG_CHECK(shares != NULL);
-    ARG_CHECK(vss_commitments != NULL);
+    VERIFY_CHECK(agg_share != NULL);
+    VERIFY_CHECK(agg_pk != NULL);
+    VERIFY_CHECK(vss_hash != NULL);
+    VERIFY_CHECK(shares != NULL);
+    VERIFY_CHECK(vss_commitments != NULL);
     ARG_CHECK(n_shares > 1);
-    ARG_CHECK(idx > 0);
     ARG_CHECK(threshold > 1);
 
     if (threshold > n_shares) {
@@ -215,7 +220,7 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
         if (overflow) {
             return 0;
         }
-        if (!vss_verify(ctx, threshold, idx, &share_i, &vss_commitments[i])) {
+        if (!vss_verify(ctx, threshold, pk, &share_i, &vss_commitments[i])) {
             return 0;
         }
         secp256k1_scalar_add(&acc, &acc, &share_i);

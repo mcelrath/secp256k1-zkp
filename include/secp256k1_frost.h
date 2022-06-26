@@ -59,11 +59,11 @@ typedef struct {
 
 /** Opaque data structure that holds a signer's public nonce.
 *
-*  Guaranteed to be 134 bytes in size. It can be safely copied/moved. Serialized
+*  Guaranteed to be 132 bytes in size. It can be safely copied/moved. Serialized
 *  and parsed with `frost_pubnonce_serialize` and `frost_pubnonce_parse`.
 */
 typedef struct {
-    unsigned char data[134];
+    unsigned char data[132];
 } secp256k1_frost_pubnonce;
 
 /* TODO: add `frost_aggnonce_parse` */
@@ -101,24 +101,24 @@ typedef struct {
  *  Returns: 1 when the nonce could be parsed, 0 otherwise.
  *  Args:    ctx: a secp256k1 context object
  *  Out:   nonce: pointer to a nonce object
- *  In:     in68: pointer to the 68-byte nonce to be parsed
+ *  In:     in66: pointer to the 66-byte nonce to be parsed
  */
 SECP256K1_API int secp256k1_frost_pubnonce_parse(
     const secp256k1_context* ctx,
     secp256k1_frost_pubnonce* nonce,
-    const unsigned char *in68
+    const unsigned char *in66
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Serialize a signer's public nonce
  *
  *  Returns: 1 when the nonce could be serialized, 0 otherwise
  *  Args:    ctx: a secp256k1 context object
- *  Out:   out68: pointer to a 68-byte array to store the serialized nonce
+ *  Out:   out66: pointer to a 66-byte array to store the serialized nonce
  *  In:    nonce: pointer to the nonce
  */
 SECP256K1_API int secp256k1_frost_pubnonce_serialize(
     const secp256k1_context* ctx,
-    unsigned char *out68,
+    unsigned char *out66,
     const secp256k1_frost_pubnonce* nonce
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
@@ -178,32 +178,34 @@ SECP256K1_API int secp256k1_frost_partial_sig_parse(
     const unsigned char *in32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Derives polynomial shares and their coefficient commitments
+/** Derives a polynomial share and coefficient commitments
  *
- *  The shares are derived deterministically from the input parameters. The
+ *  The share is derived deterministically from the input parameters. The
  *  private key belonging to the keypair will be used as the first coefficient
  *  of the polynomial used to generate the shares and commitments.
  *
  *  Returns: 0 if the arguments are invalid, 1 otherwise
- *  Args:        ctx: pointer to a context object initialized for verification
- *  Out:    vss_commitment: the coefficient commitments. The length of this
- *                          array should be equal to the threshold.
- *                  shares: the polynomial shares. The length of this array
- *                          should be equal to n_participants.
- *   In:         threshold: the minimum number of shares required to produce a
- *                          signature
- *          n_participants: the total number of shares to be generated
- *                 keypair: pointer to a keypair used to generate the
- *                          polynomial that derives the shares
+ *  Args:            ctx: pointer to a context object initialized for
+ *                        verification
+ *  Out:  vss_commitment: the coefficient commitments. The length of this array
+ *                        should be equal to the threshold.
+ *                shares: the polynomial shares. The length of this array
+ *                        should be equal to n_participants.
+ *   In:       threshold: the minimum number of shares required to produce a
+ *                        signature
+ *        n_participants: the total number of shares to be generated
+ *               keypair: pointer to a keypair used to generate the polynomial
+ *                        that derives the shares
+ *                    pk: pointer to the public key of the share recipient
  */
 SECP256K1_API int secp256k1_frost_share_gen(
     const secp256k1_context *ctx,
     secp256k1_pubkey *vss_commitment,
-    secp256k1_frost_share *shares,
-    uint16_t threshold,
-    uint16_t n_participants,
-    const secp256k1_keypair *keypair
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(6);
+    secp256k1_frost_share *share,
+    const secp256k1_keypair *keypair,
+    const secp256k1_xonly_pubkey *pk,
+    size_t threshold
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
 /** Aggregates shares
  *
@@ -225,12 +227,12 @@ SECP256K1_API int secp256k1_frost_share_gen(
  *             agg_pk: the aggregated x-only public key
  *           vss_hash: sha256 image of the coefficient commitments
  *  In:        shares: all polynomial shares for the partcipant's index
- *          vss_commitments: coefficient commitments of all participants ordered by
+ *    vss_commitments: coefficient commitments of all participants ordered by
  *                     index
  *           n_shares: the total number of shares
  *          threshold: the minimum number of shares required to produce a
  *                     signature
- *                idx: the index of the participant whose shares are being
+ *                 pk: the public key of the participant whose shares are being
  *                     aggregated
  */
 SECP256K1_API int secp256k1_frost_share_agg(
@@ -240,10 +242,10 @@ SECP256K1_API int secp256k1_frost_share_agg(
     unsigned char *vss_hash,
     const secp256k1_frost_share * const* shares,
     const secp256k1_pubkey * const* vss_commitments,
-    uint16_t n_shares,
-    uint16_t threshold,
-    uint16_t idx
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
+    size_t n_shares,
+    size_t threshold,
+    const secp256k1_xonly_pubkey *pk
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(9);
 
 /** Starts a signing session by generating a nonce
  *
@@ -293,7 +295,6 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
     secp256k1_frost_secnonce *secnonce,
     secp256k1_frost_pubnonce *pubnonce,
     const unsigned char *session_id32,
-    uint16_t idx,
     const secp256k1_frost_share *agg_share,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
@@ -313,18 +314,20 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
  *                      greater than 0.
  *               msg32: the 32-byte message to sign
  *              agg_pk: the FROST-aggregated public key
- *                 idx: the index of the participant who will use the session
- *                      for signing
+ *                  pk: the public key of the participant who will use the
+ *                      session for signing
+ *             pubkeys: array of pointers to public keys of the signers
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_nonce_process(
     const secp256k1_context* ctx,
     secp256k1_frost_session *session,
     const secp256k1_frost_pubnonce * const* pubnonces,
-    uint16_t n_pubnonces,
+    size_t n_pubnonces,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
-    uint16_t idx
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
+    const secp256k1_xonly_pubkey *pk,
+    const secp256k1_xonly_pubkey * const* pubkeys
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8);
 
 /** Produces a partial signature
  *
@@ -369,7 +372,7 @@ SECP256K1_API int secp256k1_frost_partial_sig_agg(
     unsigned char *sig64,
     const secp256k1_frost_session *session,
     const secp256k1_frost_partial_sig * const* partial_sigs,
-    uint16_t n_sigs
+    size_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 #ifdef __cplusplus

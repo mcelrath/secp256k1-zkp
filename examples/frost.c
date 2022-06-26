@@ -61,14 +61,16 @@ int create_keypair(const secp256k1_context* ctx, struct signer_secrets *signer_s
 
  /* Create shares and coefficient commitments */
 int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, secp256k1_xonly_pubkey *agg_pk) {
-    int i;
+    int i, j;
     secp256k1_frost_share shares[N_SIGNERS][N_SIGNERS];
     const secp256k1_pubkey *vss_commitments[N_SIGNERS];
 
     for (i = 0; i < N_SIGNERS; i++) {
-        /* Generate a polynomial share for each participant */
-        if (!secp256k1_frost_share_gen(ctx, signer[i].vss_commitment, shares[i], THRESHOLD, N_SIGNERS, &signer_secrets[i].keypair)) {
-            return 0;
+        for (j = 0; j < N_SIGNERS; j++) {
+            /* Generate a polynomial share for each participant */
+            if (!secp256k1_frost_share_gen(ctx, signer[i].vss_commitment, &shares[i][j], &signer_secrets[i].keypair, &signer[j].pubkey, THRESHOLD)) {
+                return 0;
+            }
         }
         vss_commitments[i] = signer[i].vss_commitment;
     }
@@ -76,7 +78,6 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
     /* KeyGen communication round 1: exchange shares, nonce commitments, and
      * coefficient commitments */
     for (i = 0; i < N_SIGNERS; i++) {
-        int j;
         const secp256k1_frost_share *assigned_shares[N_SIGNERS];
 
         /* Each participant receives a share from each participant (including
@@ -85,7 +86,7 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
             assigned_shares[j] = &shares[j][i];
         }
         /* Each participant aggregates the shares they received. */
-        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, agg_pk, signer[i].vss_hash, assigned_shares, vss_commitments, N_SIGNERS, THRESHOLD, i+1)) {
+        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, agg_pk, signer[i].vss_hash, assigned_shares, vss_commitments, N_SIGNERS, THRESHOLD, &signer[i].pubkey)) {
             return 0;
         }
     }
@@ -122,8 +123,9 @@ int sign_vss(const secp256k1_context* ctx, struct signer_secrets *signer_secrets
 /* Sign a message hash with the given threshold and aggregate shares and store
  * the result in sig */
 int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, const unsigned char* msg32, secp256k1_xonly_pubkey *agg_pk, unsigned char *sig64) {
-    uint16_t i;
+    size_t i;
     const secp256k1_frost_pubnonce *pubnonces[N_SIGNERS];
+    const secp256k1_xonly_pubkey *pubkeys[N_SIGNERS];
     const secp256k1_frost_partial_sig *partial_sigs[N_SIGNERS];
     /* The same for all signers */
     secp256k1_frost_session session;
@@ -149,15 +151,16 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         }
         /* Initialize session and create secret nonce for signing and public
          * nonce to send to the other signers. */
-        if (!secp256k1_frost_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, i+1, &signer_secrets[i].agg_share, msg32, agg_pk, NULL)) {
+        if (!secp256k1_frost_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, &signer_secrets[i].agg_share, msg32, agg_pk, NULL)) {
             return 0;
         }
         pubnonces[i] = &signer[i].pubnonce;
+        pubkeys[i] = &signer[i].pubkey;
     }
 
     /* Signing communication round 1: Exchange nonces */
     for (i = 0; i < THRESHOLD; i++) {
-        if (!secp256k1_frost_nonce_process(ctx, &session, pubnonces, THRESHOLD, msg32, agg_pk, i+1)) {
+        if (!secp256k1_frost_nonce_process(ctx, &session, pubnonces, THRESHOLD, msg32, agg_pk, &signer[i].pubkey, pubkeys)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it to 0. That's because
