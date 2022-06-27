@@ -197,7 +197,6 @@ SECP256K1_API int secp256k1_frost_partial_sig_parse(
  *             threshold: the minimum number of shares required to produce a
  *                        signature
  */
-/* TODO: hash the public key to get the share index */
 SECP256K1_API int secp256k1_frost_share_gen(
     const secp256k1_context *ctx,
     secp256k1_pubkey *vss_commitment,
