@@ -29,7 +29,9 @@ struct signer_secrets {
 
 struct signer {
     secp256k1_xonly_pubkey pubkey;
+    secp256k1_pubkey share_pk;
     secp256k1_frost_pubnonce pubnonce;
+    secp256k1_frost_session session;
     secp256k1_frost_partial_sig partial_sig;
     secp256k1_pubkey vss_commitment[THRESHOLD];
     unsigned char vss_hash[32];
@@ -104,7 +106,7 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
             assigned_shares[j] = &shares[j][i];
         }
         /* Each participant aggregates the shares they received. */
-        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, agg_pk, signer[i].vss_hash, assigned_shares, vss_commitments, N_SIGNERS, THRESHOLD, &signer[i].pubkey)) {
+        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, &signer[i].share_pk, agg_pk, signer[i].vss_hash, assigned_shares, vss_commitments, N_SIGNERS, THRESHOLD, &signer[i].pubkey)) {
             return 0;
         }
     }
@@ -141,12 +143,10 @@ int sign_vss(const secp256k1_context* ctx, struct signer_secrets *signer_secrets
 /* Sign a message hash with the given threshold and aggregate shares and store
  * the result in sig */
 int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, const unsigned char* msg32, secp256k1_xonly_pubkey *agg_pk, unsigned char *sig64) {
-    size_t i;
+    int i;
     const secp256k1_frost_pubnonce *pubnonces[N_SIGNERS];
     const secp256k1_xonly_pubkey *pubkeys[N_SIGNERS];
     const secp256k1_frost_partial_sig *partial_sigs[N_SIGNERS];
-    /* The same for all signers */
-    secp256k1_frost_session session;
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
@@ -178,20 +178,37 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
 
     /* Signing communication round 1: Exchange nonces */
     for (i = 0; i < THRESHOLD; i++) {
-        if (!secp256k1_frost_nonce_process(ctx, &session, pubnonces, THRESHOLD, msg32, agg_pk, &signer[i].pubkey, pubkeys)) {
+        if (!secp256k1_frost_nonce_process(ctx, &signer[i].session, pubnonces, THRESHOLD, msg32, agg_pk, &signer[i].pubkey, pubkeys)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it to 0. That's because
          * you must _never_ reuse the secnonce (or use the same session_id to
          * create a secnonce). If you do, you effectively reuse the nonce and
          * leak the secret key. */
-        if (!secp256k1_frost_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].agg_share, &session)) {
+        if (!secp256k1_frost_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].agg_share, &signer[i].session)) {
             return 0;
         }
         partial_sigs[i] = &signer[i].partial_sig;
     }
-    /* Signing communication round 2: Exchange partial signatures */
-    return secp256k1_frost_partial_sig_agg(ctx, sig64, &session, partial_sigs, THRESHOLD);
+    /* Communication round 2: A production system would exchange
+     * partial signatures here before moving on. */
+    for (i = 0; i < THRESHOLD; i++) {
+        /* To check whether signing was successful, it suffices to either verify
+         * the aggregate signature with the aggregate public key using
+         * secp256k1_schnorrsig_verify, or verify all partial signatures of all
+         * signers individually. Verifying the aggregate signature is cheaper but
+         * verifying the individual partial signatures has the advantage that it
+         * can be used to determine which of the partial signatures are invalid
+         * (if any), i.e., which of the partial signatures cause the aggregate
+         * signature to be invalid and thus the protocol run to fail. It's also
+         * fine to first verify the aggregate sig, and only verify the individual
+         * sigs if it does not work.
+         */
+        if (!secp256k1_frost_partial_sig_verify(ctx, &signer[i].partial_sig, &signer[i].pubnonce, &signer[i].share_pk, &signer[i].session)) {
+            return 0;
+        }
+    }
+    return secp256k1_frost_partial_sig_agg(ctx, sig64, &signer[0].session, partial_sigs, THRESHOLD);
 }
 
 int main(void) {

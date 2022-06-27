@@ -224,6 +224,7 @@ SECP256K1_API int secp256k1_frost_share_gen(
  *           the resulting signature verifies).
  *  Args:         ctx: pointer to a context object
  *  Out:    agg_share: the aggregated share
+ *           share_pk: the public verification share of the aggregated share
  *             agg_pk: the aggregated x-only public key
  *           vss_hash: sha256 image of the coefficient commitments
  *  In:        shares: all polynomial shares for the partcipant's index
@@ -238,6 +239,7 @@ SECP256K1_API int secp256k1_frost_share_gen(
 SECP256K1_API int secp256k1_frost_share_agg(
     const secp256k1_context* ctx,
     secp256k1_frost_share *agg_share,
+    secp256k1_pubkey *share_pk,
     secp256k1_xonly_pubkey *agg_pk,
     unsigned char *vss_hash,
     const secp256k1_frost_share * const* shares,
@@ -245,7 +247,7 @@ SECP256K1_API int secp256k1_frost_share_agg(
     size_t n_shares,
     size_t threshold,
     const secp256k1_xonly_pubkey *pk
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(9);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(10);
 
 /** Starts a signing session by generating a nonce
  *
@@ -351,6 +353,43 @@ SECP256K1_API int secp256k1_frost_partial_sign(
     secp256k1_frost_partial_sig *partial_sig,
     secp256k1_frost_secnonce *secnonce,
     const secp256k1_frost_share *agg_share,
+    const secp256k1_frost_session *session
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+
+/** Verifies an individual signer's partial signature
+ *
+ *  The signature is verified for a specific signing session. In order to avoid
+ *  accidentally verifying a signature from a different or non-existing signing
+ *  session, you must ensure the following:
+ *    1. The `pubnonces` includes the identical [TODO: FIX].
+ *    2. The `pubkey` argument must be identical to the one sent by the signer
+ *       before aggregating it with `frost_pubkey_agg` to create the
+ *       `keyagg_cache`. [TODO: FIX]
+ *    3. The `pubnonce` argument must be identical to the one sent by the signer
+ *       before aggregating it with `frost_nonce_agg` and using the result to
+ *       create the `session` with `frost_nonce_process` [TODO: FIX].
+ *
+ *  This function is essential when using protocols with adaptor signatures.
+ *  However, it is not essential for regular FROST sessions, in the sense that if any
+ *  partial signature does not verify, the full signature will not verify either, so the
+ *  problem will be caught. But this function allows determining the specific party
+ *  who produced an invalid signature.
+ *
+ *  Returns: 0 if the arguments are invalid or the partial signature does not
+ *           verify, 1 otherwise
+ *  Args         ctx: pointer to a context object, initialized for verification
+ *  In:  partial_sig: pointer to partial signature to verify, sent by
+ *                    the signer associated with `pubnonce` and `pubkey`
+ *          pubnonce: public nonce of the signer in the signing session
+ *          pubshare: public share of the signer in the signing session
+ *           session: pointer to the session that was created with
+ *                    `frost_nonce_process`
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_partial_sig_verify(
+    const secp256k1_context* ctx,
+    const secp256k1_frost_partial_sig *partial_sig,
+    const secp256k1_frost_pubnonce *pubnonce,
+    const secp256k1_pubkey *share_pk,
     const secp256k1_frost_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 

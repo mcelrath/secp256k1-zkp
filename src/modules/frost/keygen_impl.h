@@ -203,7 +203,7 @@ static int vss_verify(const secp256k1_context* ctx, size_t threshold, const secp
     return secp256k1_gej_is_infinity(&tmpj);
 }
 
-int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* vss_commitments, size_t n_shares, size_t threshold, const secp256k1_xonly_pubkey *pk) {
+int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_pubkey *share_pk, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* vss_commitments, size_t n_shares, size_t threshold, const secp256k1_xonly_pubkey *pk) {
     secp256k1_frost_pubkey_combine_ecmult_data pubkey_combine_ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
@@ -262,6 +262,10 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
         secp256k1_scalar_negate(&acc, &acc);
     }
     secp256k1_scalar_get_b32((unsigned char *) agg_share->data, &acc);
+    /* Compute commitment to aggregate share */
+    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &pkj, &acc);
+    secp256k1_ge_set_gej(&pkp, &pkj);
+    secp256k1_pubkey_save(share_pk, &pkp);
 
     return 1;
 }
