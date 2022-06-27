@@ -281,7 +281,6 @@ SECP256K1_API int secp256k1_frost_share_agg(
  *                     unique to this call to secp256k1_frost_nonce_gen and
  *                     must be uniformly random unless you really know what you
  *                     are doing.
- *                idx: the index of the participant who is generating the nonce
  *          agg_share: the aggregated share that will later be used for
  *                     signing, if already known (can be NULL)
  *              msg32: the 32-byte message that will later be signed, if
