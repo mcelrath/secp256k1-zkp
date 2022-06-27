@@ -80,11 +80,11 @@ typedef struct {
 /** Opaque data structure that holds a FROST session.
  *
  *  This structure is not required to be kept secret for the signing protocol to
- *  be secure. Guaranteed to be 165 bytes in size. It can be safely
+ *  be secure. Guaranteed to be 133 bytes in size. It can be safely
  *  copied/moved. No serialization and parsing functions.
  */
 typedef struct {
-    unsigned char data[165];
+    unsigned char data[133];
 } secp256k1_frost_session;
 
 /** Opaque data structure that holds a partial MuSig signature.

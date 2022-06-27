@@ -18,7 +18,6 @@ typedef struct {
     secp256k1_scalar noncecoef;
     secp256k1_scalar challenge;
     secp256k1_scalar s_part;
-    secp256k1_scalar lagrange;
 } secp256k1_frost_session_internal;
 
 #endif
