@@ -548,7 +548,7 @@ int secp256k1_frost_partial_sig_verify(const secp256k1_context* ctx, const secp2
     }
 
     /* Compute "effective" nonce rj = aggnonce[0] + b*aggnonce[1] */
-    /* TODO: use multiexp to compute -s*G + c*pubshare + aggnonce[0] + b*aggnonce[1] */
+    /* TODO: use multiexp to compute -s*G + e*share_pk + aggnonce[0] + b*aggnonce[1] */
     if (!secp256k1_frost_pubnonce_load(ctx, nonce_pt, pubnonce)) {
         return 0;
     }

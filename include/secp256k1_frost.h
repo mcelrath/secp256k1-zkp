@@ -381,7 +381,8 @@ SECP256K1_API int secp256k1_frost_partial_sign(
  *  In:  partial_sig: pointer to partial signature to verify, sent by
  *                    the signer associated with `pubnonce` and `pubkey`
  *          pubnonce: public nonce of the signer in the signing session
- *          pubshare: public share of the signer in the signing session
+ *          share_pk: public verification share of the signer in the signing
+ *                    session
  *           session: pointer to the session that was created with
  *                    `frost_nonce_process`
  */
