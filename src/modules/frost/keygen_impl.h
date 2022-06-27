@@ -11,8 +11,29 @@
 #include "../../ecmult.h"
 #include "../../field.h"
 #include "../../group.h"
-#include "../../scalar.h"
 #include "../../hash.h"
+
+static int secp256k1_frost_compute_indexhash(const secp256k1_context *ctx, secp256k1_scalar *indexhash, const secp256k1_xonly_pubkey *pk) {
+    secp256k1_sha256 sha;
+    unsigned char buf[32];
+    int overflow;
+    const unsigned char zerobyte[1] = {0};
+
+    if (!secp256k1_xonly_pubkey_serialize(ctx, buf, pk)) {
+        return 0;
+    }
+    secp256k1_sha256_initialize_tagged(&sha, (unsigned char*)"FROST/index", sizeof("FROST/index") - 1);
+    secp256k1_sha256_write(&sha, buf, sizeof(buf));
+    /* TODO: add sub_indices for weights > 1 */
+    secp256k1_sha256_write(&sha, zerobyte, 1);
+    secp256k1_sha256_finalize(&sha, buf);
+    secp256k1_scalar_set_b32(indexhash, buf, &overflow);
+    if (overflow) {
+        return 0;
+    }
+
+    return 1;
+}
 
 /* Generate polynomial coefficients, coefficient commitments, and a share, from */
 /* a seed and a secret key. */
@@ -26,7 +47,6 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
     unsigned char rngseed[32];
     secp256k1_scalar rand[2];
     size_t i;
-    int overflow;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
@@ -70,11 +90,8 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
     }
     /* Derive share */
     secp256k1_scalar_clear(&share_i);
-    if (!secp256k1_xonly_pubkey_serialize(ctx, buf, pk)) {
-        return 0;
-    }
-    secp256k1_scalar_set_b32(&idx, buf, &overflow);
-    if (overflow) {
+
+    if (!secp256k1_frost_compute_indexhash(ctx, &idx, pk)) {
         return 0;
     }
     for (i = 0; i < threshold - 1; i++) {
@@ -166,8 +183,6 @@ static int vss_verify(const secp256k1_context* ctx, size_t threshold, const secp
     secp256k1_scalar share_neg;
     secp256k1_gej tmpj;
     secp256k1_frost_verify_share_ecmult_data verify_share_ecmult_data;
-    int overflow;
-    unsigned char pk32[32];
 
     /* Use an EC multi-multiplication to verify the following equation:
      *   0 = - share_i*G + idx^0*vss_commitment[0]
@@ -176,11 +191,7 @@ static int vss_verify(const secp256k1_context* ctx, size_t threshold, const secp
     verify_share_ecmult_data.ctx = ctx;
     verify_share_ecmult_data.vss_commitment = vss_commitment;
     /* Evaluate the public polynomial at the idx */
-     if (!secp256k1_xonly_pubkey_serialize(ctx, pk32, pk)) {
-        return 0;
-    }
-    secp256k1_scalar_set_b32(&verify_share_ecmult_data.idx, pk32, &overflow);
-    if (overflow) {
+    if (!secp256k1_frost_compute_indexhash(ctx, &verify_share_ecmult_data.idx, pk)) {
         return 0;
     }
     secp256k1_scalar_set_int(&verify_share_ecmult_data.idxn, 1);

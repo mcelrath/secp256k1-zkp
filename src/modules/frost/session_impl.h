@@ -9,6 +9,7 @@
 
 #include <string.h>
 
+#include "keygen.h"
 #include "session.h"
 #include "../../eckey.h"
 #include "../../ecmult.h"
@@ -390,31 +391,20 @@ static int secp256k1_frost_lagrange_coefficient(const secp256k1_context* ctx, se
     secp256k1_scalar num;
     secp256k1_scalar den;
     secp256k1_scalar party_idx;
-    unsigned char pk32[32];
-    int overflow;
 
     secp256k1_scalar_set_int(&num, 1);
     secp256k1_scalar_set_int(&den, 1);
-    if (!secp256k1_xonly_pubkey_serialize(ctx, pk32, pk)) {
-        return 0;
-    }
-    secp256k1_scalar_set_b32(&party_idx, pk32, &overflow);
-    if (overflow) {
+    if (!secp256k1_frost_compute_indexhash(ctx, &party_idx, pk)) {
         return 0;
     }
     for (i = 0; i < n_participants; i++) {
         secp256k1_scalar mul;
-        unsigned char counterparty_pk32[32];
 
-        if (!secp256k1_xonly_pubkey_serialize(ctx, counterparty_pk32, pubkeys[i])) {
+        if (!secp256k1_frost_compute_indexhash(ctx, &mul, pubkeys[i])) {
             return 0;
         }
-        if (!secp256k1_memcmp_var(pk32, counterparty_pk32, 32)) {
+        if (secp256k1_scalar_eq(&mul, &party_idx)) {
             continue;
-        }
-        secp256k1_scalar_set_b32(&mul, counterparty_pk32, &overflow);
-        if (overflow) {
-            return 0;
         }
 
         secp256k1_scalar_negate(&mul, &mul);
@@ -438,9 +428,9 @@ int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_
     int i;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(session != NULL);
-    ARG_CHECK(msg32 != NULL);
-    ARG_CHECK(pubnonces != NULL);
+    VERIFY_CHECK(session != NULL);
+    VERIFY_CHECK(msg32 != NULL);
+    VERIFY_CHECK(pubnonces != NULL);
     ARG_CHECK(n_pubnonces > 1);
 
     if (!secp256k1_xonly_pubkey_serialize(ctx, agg_pk32, agg_pk)) {
@@ -503,7 +493,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
 
     VERIFY_CHECK(ctx != NULL);
 
-    ARG_CHECK(secnonce != NULL);
+    VERIFY_CHECK(secnonce != NULL);
     /* Fails if the magic doesn't match */
     ret = secp256k1_frost_secnonce_load(ctx, k, secnonce);
     /* Set nonce to zero to avoid nonce reuse. This will cause subsequent calls
@@ -514,9 +504,9 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
         return 0;
     }
 
-    ARG_CHECK(partial_sig != NULL);
-    ARG_CHECK(agg_share != NULL);
-    ARG_CHECK(session != NULL);
+    VERIFY_CHECK(partial_sig != NULL);
+    VERIFY_CHECK(agg_share != NULL);
+    VERIFY_CHECK(session != NULL);
 
     secp256k1_scalar_set_b32(&sk, agg_share->data, &overflow);
     if (overflow) {
@@ -547,9 +537,9 @@ int secp256k1_frost_partial_sig_agg(const secp256k1_context* ctx, unsigned char 
     secp256k1_frost_session_internal session_i;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(sig64 != NULL);
-    ARG_CHECK(session != NULL);
-    ARG_CHECK(partial_sigs != NULL);
+    VERIFY_CHECK(sig64 != NULL);
+    VERIFY_CHECK(session != NULL);
+    VERIFY_CHECK(partial_sigs != NULL);
     ARG_CHECK(n_sigs > 0);
 
     if (!secp256k1_frost_session_load(ctx, &session_i, session)) {

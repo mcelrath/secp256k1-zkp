@@ -10,4 +10,8 @@
 #include "../../../include/secp256k1.h"
 #include "../../../include/secp256k1_frost.h"
 
+#include "../../scalar.h"
+
+static int secp256k1_frost_compute_indexhash(const secp256k1_context *ctx, secp256k1_scalar *indexhash, const secp256k1_xonly_pubkey *pk);
+
 #endif
