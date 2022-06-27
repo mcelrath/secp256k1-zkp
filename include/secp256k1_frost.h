@@ -189,23 +189,23 @@ SECP256K1_API int secp256k1_frost_partial_sig_parse(
  *                        verification
  *  Out:  vss_commitment: the coefficient commitments. The length of this array
  *                        should be equal to the threshold.
- *                shares: the polynomial shares. The length of this array
- *                        should be equal to n_participants.
- *   In:       threshold: the minimum number of shares required to produce a
- *                        signature
- *        n_participants: the total number of shares to be generated
- *               keypair: pointer to a keypair used to generate the polynomial
+ *                share:  pointer to the polynomial share
+ *   In:        keypair:  pointer to a keypair used to generate the polynomial
  *                        that derives the shares
  *                    pk: pointer to the public key of the share recipient
+ *             threshold: the minimum number of shares required to produce a
+ *                        signature
  */
+/* TODO: hash the public key to get the share index */
 SECP256K1_API int secp256k1_frost_share_gen(
     const secp256k1_context *ctx,
     secp256k1_pubkey *vss_commitment,
     secp256k1_frost_share *share,
+    const unsigned char *session_id32,
     const secp256k1_keypair *keypair,
     const secp256k1_xonly_pubkey *pk,
     size_t threshold
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 /** Aggregates shares
  *

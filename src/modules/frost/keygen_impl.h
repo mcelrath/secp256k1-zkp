@@ -14,11 +14,10 @@
 #include "../../scalar.h"
 #include "../../hash.h"
 
-/* TODO: add session ID */
 /* TODO: make vss_commitment optional */
 /* Generate polynomial coefficients, coefficient commitments, and a share, from */
 /* a seed and a secret key. */
-int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *share, const secp256k1_keypair *keypair, const secp256k1_xonly_pubkey *pk, size_t threshold) {
+int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *share, const unsigned char *session_id, const secp256k1_keypair *keypair, const secp256k1_xonly_pubkey *pk, size_t threshold) {
     secp256k1_sha256 sha;
     secp256k1_scalar idx;
     secp256k1_scalar sk;
@@ -47,6 +46,7 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
     /* Compute seed which commits to all inputs */
     secp256k1_scalar_get_b32(buf, &sk);
     secp256k1_sha256_initialize(&sha);
+    secp256k1_sha256_write(&sha, session_id, 32);
     secp256k1_sha256_write(&sha, buf, 32);
     for (i = 0; i < 8; i++) {
         rngseed[i + 0] = threshold / (1ull << (i * 8));

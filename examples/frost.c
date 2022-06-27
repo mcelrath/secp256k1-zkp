@@ -66,9 +66,22 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
     const secp256k1_pubkey *vss_commitments[N_SIGNERS];
 
     for (i = 0; i < N_SIGNERS; i++) {
+        FILE *frand;
+        unsigned char session_id[32];
+        /* Create random session ID. It is absolutely necessary that the session ID
+         * is unique for every call of secp256k1_frost_share_gen for a given pubkey. */
+        frand = fopen("/dev/urandom", "r");
+        if(frand == NULL) {
+            return 0;
+        }
+        if (!fread(session_id, 32, 1, frand)) {
+            fclose(frand);
+            return 0;
+        }
+        fclose(frand);
         for (j = 0; j < N_SIGNERS; j++) {
             /* Generate a polynomial share for each participant */
-            if (!secp256k1_frost_share_gen(ctx, signer[i].vss_commitment, &shares[i][j], &signer_secrets[i].keypair, &signer[j].pubkey, THRESHOLD)) {
+            if (!secp256k1_frost_share_gen(ctx, signer[i].vss_commitment, &shares[i][j], session_id, &signer_secrets[i].keypair, &signer[j].pubkey, THRESHOLD)) {
                 return 0;
             }
         }
