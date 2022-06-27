@@ -188,9 +188,10 @@ SECP256K1_API int secp256k1_frost_partial_sig_parse(
  *  Args:            ctx: pointer to a context object initialized for
  *                        verification
  *  Out:  vss_commitment: the coefficient commitments. The length of this array
- *                        should be equal to the threshold.
- *                share:  pointer to the polynomial share
- *   In:        keypair:  pointer to a keypair used to generate the polynomial
+ *                        should be equal to the threshold (can be NULL).
+ *                 share: pointer to the polynomial share
+ *   In:    session_id32: a 32-byte session_id32 as explained above
+ *               keypair: pointer to a keypair used to generate the polynomial
  *                        that derives the shares
  *                    pk: pointer to the public key of the share recipient
  *             threshold: the minimum number of shares required to produce a
