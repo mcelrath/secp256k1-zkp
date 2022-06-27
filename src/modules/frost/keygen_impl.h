@@ -14,7 +14,6 @@
 #include "../../scalar.h"
 #include "../../hash.h"
 
-/* TODO: make vss_commitment optional */
 /* Generate polynomial coefficients, coefficient commitments, and a share, from */
 /* a seed and a secret key. */
 int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *share, const unsigned char *session_id, const secp256k1_keypair *keypair, const secp256k1_xonly_pubkey *pk, size_t threshold) {
@@ -31,7 +30,6 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    VERIFY_CHECK(vss_commitment != NULL);
     VERIFY_CHECK(share != NULL);
     VERIFY_CHECK(keypair != NULL);
     VERIFY_CHECK(pk != NULL);
@@ -42,7 +40,9 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
     }
     /* The first coefficient is the secret key, and thus the first commitment
      * is the public key. */
-    secp256k1_pubkey_save(&vss_commitment[0], &ge_tmp);
+    if (vss_commitment != NULL) {
+        secp256k1_pubkey_save(&vss_commitment[0], &ge_tmp);
+    }
     /* Compute seed which commits to all inputs */
     secp256k1_scalar_get_b32(buf, &sk);
     secp256k1_sha256_initialize(&sha);
@@ -64,7 +64,9 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
         /* Compute commitment to each coefficient */
         secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &rand[i % 2]);
         secp256k1_ge_set_gej(&rp, &rj);
-        secp256k1_pubkey_save(&vss_commitment[threshold - i - 1], &rp);
+        if (vss_commitment != NULL) {
+            secp256k1_pubkey_save(&vss_commitment[threshold - i - 1], &rp);
+        }
     }
     /* Derive share */
     secp256k1_scalar_clear(&share_i);

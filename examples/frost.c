@@ -79,13 +79,18 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
             return 0;
         }
         fclose(frand);
-        for (j = 0; j < N_SIGNERS; j++) {
-            /* Generate a polynomial share for each participant */
-            if (!secp256k1_frost_share_gen(ctx, signer[i].vss_commitment, &shares[i][j], session_id, &signer_secrets[i].keypair, &signer[j].pubkey, THRESHOLD)) {
+        /* Generate a polynomial share for the first participant and save the
+         * vss commitment */
+        if (!secp256k1_frost_share_gen(ctx, signer[i].vss_commitment, &shares[i][0], session_id, &signer_secrets[i].keypair, &signer[0].pubkey, THRESHOLD)) {
+            return 0;
+        }
+        vss_commitments[i] = signer[i].vss_commitment;
+        for (j = 1; j < N_SIGNERS; j++) {
+            /* Generate a polynomial share for the remaining participants */
+            if (!secp256k1_frost_share_gen(ctx, NULL, &shares[i][j], session_id, &signer_secrets[i].keypair, &signer[j].pubkey, THRESHOLD)) {
                 return 0;
             }
         }
-        vss_commitments[i] = signer[i].vss_commitment;
     }
 
     /* KeyGen communication round 1: exchange shares, nonce commitments, and
