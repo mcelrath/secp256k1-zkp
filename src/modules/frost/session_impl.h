@@ -530,7 +530,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
 
 int secp256k1_frost_partial_sig_verify(const secp256k1_context* ctx, const secp256k1_frost_partial_sig *partial_sig, const secp256k1_frost_pubnonce *pubnonce, const secp256k1_pubkey *share_pk, const secp256k1_frost_session *session) {
     secp256k1_frost_session_internal session_i;
-    secp256k1_scalar e, s;
+    secp256k1_scalar s;
     secp256k1_gej pkj;
     secp256k1_ge nonce_pt[2];
     secp256k1_gej rj;
@@ -548,7 +548,7 @@ int secp256k1_frost_partial_sig_verify(const secp256k1_context* ctx, const secp2
     }
 
     /* Compute "effective" nonce rj = aggnonce[0] + b*aggnonce[1] */
-    /* TODO: use multiexp to compute -s*G + e*mu*pubshare + aggnonce[0] + b*aggnonce[1] */
+    /* TODO: use multiexp to compute -s*G + c*pubshare + aggnonce[0] + b*aggnonce[1] */
     if (!secp256k1_frost_pubnonce_load(ctx, nonce_pt, pubnonce)) {
         return 0;
     }
@@ -559,7 +559,6 @@ int secp256k1_frost_partial_sig_verify(const secp256k1_context* ctx, const secp2
     if (!secp256k1_pubkey_load(ctx, &pkp, share_pk)) {
         return 0;
     }
-    secp256k1_scalar_mul(&e, &session_i.challenge, &session_i.lagrange);
 
     if (!secp256k1_frost_partial_sig_load(ctx, &s, partial_sig)) {
         return 0;
@@ -567,7 +566,7 @@ int secp256k1_frost_partial_sig_verify(const secp256k1_context* ctx, const secp2
     /* Compute -s*G + e*pkj + rj (e already includes the lagrange coefficient l) */
     secp256k1_scalar_negate(&s, &s);
     secp256k1_gej_set_ge(&pkj, &pkp);
-    secp256k1_ecmult(&tmp, &pkj, &e, &s);
+    secp256k1_ecmult(&tmp, &pkj, &session_i.challenge, &s);
     if (session_i.fin_nonce_parity) {
         secp256k1_gej_neg(&rj, &rj);
     }
