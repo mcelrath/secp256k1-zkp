@@ -81,7 +81,7 @@ static int secp256k1_frost_aggnonce_load(const secp256k1_context* ctx, secp256k1
     return secp256k1_frost_pubnonce_load(ctx, ge, (secp256k1_frost_pubnonce *) nonce);
 }
 
-static const unsigned char secp256k1_frost_session_cache_magic[4] = { 0x9d, 0xed, 0xe9, 0x17 };
+static const unsigned char secp256k1_frost_session_cache_magic[4] = { 0x5c, 0x11, 0xa8, 0x3 };
 
 /* A session consists of
  * - 4 byte session cache magic
@@ -124,7 +124,7 @@ static int secp256k1_frost_session_load(const secp256k1_context* ctx, secp256k1_
     return 1;
 }
 
-static const unsigned char secp256k1_frost_partial_sig_magic[4] = { 0xeb, 0xfb, 0x1a, 0x32 };
+static const unsigned char secp256k1_frost_partial_sig_magic[4] = { 0x8d, 0xd8, 0x31, 0x6e };
 
 static void secp256k1_frost_partial_sig_save(secp256k1_frost_partial_sig* sig, secp256k1_scalar *s) {
     memcpy(&sig->data[0], secp256k1_frost_partial_sig_magic, 4);
