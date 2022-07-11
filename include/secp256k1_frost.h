@@ -66,7 +66,6 @@ typedef struct {
     unsigned char data[132];
 } secp256k1_frost_pubnonce;
 
-/* TODO: add `frost_aggnonce_parse` */
 /** Opaque data structure that holds an aggregate public nonce.
  *
  *  Guaranteed to be 132 bytes in size. It can be safely copied/moved.

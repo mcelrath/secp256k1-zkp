@@ -97,8 +97,8 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
         }
     }
 
-    /* KeyGen communication round 1: exchange shares, nonce commitments, and
-     * coefficient commitments */
+    /* KeyGen communication round 1: exchange shares and coefficient
+     * commitments */
     for (i = 0; i < N_SIGNERS; i++) {
         const secp256k1_frost_share *assigned_shares[N_SIGNERS];
 
@@ -179,7 +179,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         }
     }
     /* Select a random subset of signers */
-    for (i =0; i < THRESHOLD; i++) {
+    for (i = 0; i < THRESHOLD; i++) {
         while (1) {
             if (!fill_random(&seed[i], 1)) {
                 return 0;
