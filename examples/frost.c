@@ -142,9 +142,48 @@ int sign_vss(const secp256k1_context* ctx, struct signer_secrets *signer_secrets
     return 1;
 }
 
+/* Tweak the pubkey corresponding to the provided tweak cache, update the cache
+ * and return the tweaked aggregate pk. */
+int tweak(const secp256k1_context* ctx, secp256k1_xonly_pubkey *agg_pk, secp256k1_frost_tweak_cache *cache) {
+    secp256k1_pubkey output_pk;
+    unsigned char ordinary_tweak[32] = "this could be a BIP32 tweak....";
+    unsigned char xonly_tweak[32] = "this could be a taproot tweak..";
+
+    if (!secp256k1_frost_pubkey_tweak(ctx, cache, agg_pk)) {
+        return 0;
+    }
+
+    /* Ordinary tweaking which, for example, allows deriving multiple child
+     * public keys from a single aggregate key using BIP32 */
+    if (!secp256k1_frost_pubkey_ec_tweak_add(ctx, NULL, cache, ordinary_tweak)) {
+        return 0;
+    }
+    /* If one is not interested in signing, the same output_pk can be obtained
+     * by calling `secp256k1_frost_pubkey_get` right after key aggregation to
+     * get the full pubkey and then call `secp256k1_ec_pubkey_tweak_add`. */
+
+    /* Xonly tweaking which, for example, allows creating taproot commitments */
+    if (!secp256k1_frost_pubkey_xonly_tweak_add(ctx, &output_pk, cache, xonly_tweak)) {
+        return 0;
+    }
+    /* Note that if we wouldn't care about signing, we can arrive at the same
+     * output_pk by providing the untweaked public key to
+     * `secp256k1_xonly_pubkey_tweak_add` (after converting it to an xonly pubkey
+     * if necessary with `secp256k1_xonly_pubkey_from_pubkey`). */
+
+    /* Now we convert the output_pk to an xonly pubkey to allow to later verify
+     * the Schnorr signature against it. For this purpose we can ignore the
+     * `pk_parity` output argument; we would need it if we would have to open
+     * the taproot commitment. */
+    if (!secp256k1_xonly_pubkey_from_pubkey(ctx, agg_pk, NULL, &output_pk)) {
+        return 0;
+    }
+    return 1;
+}
+
 /* Sign a message hash with the given threshold and aggregate shares and store
  * the result in sig */
-int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, const unsigned char* msg32, secp256k1_xonly_pubkey *agg_pk, unsigned char *sig64) {
+int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, const unsigned char* msg32, secp256k1_xonly_pubkey *agg_pk, unsigned char *sig64, const secp256k1_frost_tweak_cache *cache) {
     int i;
     int signer_id = 0;
     int signers = 0;
@@ -198,14 +237,14 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
     /* Signing communication round 1: Exchange nonces */
     for (i = 0; i < THRESHOLD; i++) {
         signer_id = seed[i] % N_SIGNERS;
-        if (!secp256k1_frost_nonce_process(ctx, &signer[signer_id].session, pubnonces, THRESHOLD, msg32, agg_pk, &signer[signer_id].pubkey, pubkeys)) {
+        if (!secp256k1_frost_nonce_process(ctx, &signer[signer_id].session, pubnonces, THRESHOLD, msg32, agg_pk, &signer[signer_id].pubkey, pubkeys, cache)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it to 0. That's because
          * you must _never_ reuse the secnonce (or use the same session_id to
          * create a secnonce). If you do, you effectively reuse the nonce and
          * leak the secret key. */
-        if (!secp256k1_frost_partial_sign(ctx, &signer[signer_id].partial_sig, &signer_secrets[signer_id].secnonce, &signer_secrets[signer_id].agg_share, &signer[signer_id].session)) {
+        if (!secp256k1_frost_partial_sign(ctx, &signer[signer_id].partial_sig, &signer_secrets[signer_id].secnonce, &signer_secrets[signer_id].agg_share, &signer[signer_id].session, cache)) {
             return 0;
         }
         partial_sigs[i] = &signer[signer_id].partial_sig;
@@ -225,7 +264,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
          * fine to first verify the aggregate sig, and only verify the individual
          * sigs if it does not work.
          */
-        if (!secp256k1_frost_partial_sig_verify(ctx, &signer[signer_id].partial_sig, &signer[signer_id].pubnonce, &signer[signer_id].share_pk, &signer[signer_id].session)) {
+        if (!secp256k1_frost_partial_sig_verify(ctx, &signer[signer_id].partial_sig, &signer[signer_id].pubnonce, &signer[signer_id].share_pk, &signer[signer_id].session, cache)) {
             return 0;
         }
     }
@@ -239,6 +278,7 @@ int main(void) {
     struct signer signers[N_SIGNERS];
     unsigned char sigs[N_SIGNERS][64];
     secp256k1_xonly_pubkey agg_pk;
+    secp256k1_frost_tweak_cache cache;
     unsigned char msg[32] = "this_could_be_the_hash_of_a_msg!";
     unsigned char sig[64];
 
@@ -272,8 +312,15 @@ int main(void) {
         }
     }
     printf("ok\n");
+    printf("Tweaking................");
+    /* Optionally tweak the aggregate key */
+    if (!tweak(ctx, &agg_pk, &cache)) {
+        printf("FAILED\n");
+        return 1;
+    }
+    printf("ok\n");
     printf("Signing message with FROST.........");
-    if (!sign(ctx, signer_secrets, signers, msg, &agg_pk, sig)) {
+    if (!sign(ctx, signer_secrets, signers, msg, &agg_pk, sig, &cache)) {
         printf("FAILED\n");
         return 1;
     }

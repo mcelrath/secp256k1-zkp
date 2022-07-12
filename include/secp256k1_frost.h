@@ -30,6 +30,15 @@ extern "C" {
  *  comparison, use the corresponding serialization and parsing functions.
  */
 
+/** Opaque data structure that caches information about key tweaking.
+ *
+ *  Guaranteed to be 97 bytes in size. It can be safely copied/moved. No
+ *  serialization and parsing functions (yet).
+ */
+typedef struct {
+    unsigned char data[97];
+} secp256k1_frost_tweak_cache;
+
 /** Opaque data structure that holds the y-coordinate of a polynomial share.
  *
  *  Guaranteed to be 32 bytes in size. It can be safely copied/moved.
@@ -248,6 +257,114 @@ SECP256K1_API int secp256k1_frost_share_agg(
     const secp256k1_xonly_pubkey *pk
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(10);
 
+/** Obtain the aggregate public key from a FROST x-only aggregate public key.
+ *
+ *  This is only useful if you need the non-xonly public key, in particular for
+ *  ordinary (non-xonly) tweaking or batch-verifying multiple key aggregations
+ *  (not implemented).
+ *
+ *  Returns: 0 if the arguments are invalid, 1 otherwise
+ *  Args:        ctx: pointer to a context object
+ *  Out:   ec_agg_pk: the FROST-aggregated public key.
+ *  In: xonly_agg_pk: the aggregated x-only public key that is the output of
+ *                    `secp256k1_frost_share_agg`
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_pubkey_get(
+    const secp256k1_context* ctx,
+    secp256k1_pubkey *ec_agg_pk,
+    const secp256k1_xonly_pubkey *xonly_agg_pk
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_pubkey_tweak(
+    const secp256k1_context* ctx,
+    secp256k1_frost_tweak_cache *tweak_cache,
+    const secp256k1_xonly_pubkey *agg_pk
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Apply ordinary "EC" tweaking to a public key in a given tweak_cache by
+ *  adding the generator multiplied with `tweak32` to it. This is useful for
+ *  deriving child keys from an aggregate public key via BIP32.
+ *
+ *  The tweaking method is the same as `secp256k1_ec_pubkey_tweak_add`. So after
+ *  the following pseudocode buf and buf2 have identical contents (absent
+ *  earlier failures).
+ *
+ *  secp256k1_frost_share_agg(..., xonly_agg_pk, ...)
+ *  secp256k1_frost_pubkey_tweak(..., tweak_cache, xonly_agg_pk)
+ *  secp256k1_frost_pubkey_ec_tweak_add(..., output_pk, tweak_cache, tweak32)
+ *  secp256k1_ec_pubkey_serialize(..., buf, output_pk)
+ *  secp256k1_frost_pubkey_get(..., ec_agg_pk, xonly_agg_pk)
+ *  secp256k1_ec_pubkey_tweak_add(..., ec_agg_pk, tweak32)
+ *  secp256k1_ec_pubkey_serialize(..., buf2, ec_agg_pk)
+ *
+ *  This function is required if you want to _sign_ for a tweaked aggregate key.
+ *  On the other hand, if you are only computing a public key, but not intending
+ *  to create a signature for it, you can just use
+ *  `secp256k1_ec_pubkey_tweak_add`.
+ *
+ *  Returns: 0 if the arguments are invalid or the resulting public key would be
+ *           invalid (only when the tweak is the negation of the corresponding
+ *           secret key). 1 otherwise.
+ *  Args:            ctx: pointer to a context object initialized for verification
+ *  Out:   output_pubkey: pointer to a public key to store the result. Will be set
+ *                        to an invalid value if this function returns 0. If you
+ *                        do not need it, this arg can be NULL.
+ *  In/Out:  tweak_cache: pointer to a `frost_tweak_cache` struct initialized by
+ *                       `frost_pubkey_tweak`
+ *  In:          tweak32: pointer to a 32-byte tweak. If the tweak is invalid
+ *                        according to `secp256k1_ec_seckey_verify`, this function
+ *                        returns 0. For uniformly random 32-byte arrays the
+ *                        chance of being invalid is negligible (around 1 in
+ *                        2^128).
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_pubkey_ec_tweak_add(
+    const secp256k1_context* ctx,
+    secp256k1_pubkey *output_pubkey,
+    secp256k1_frost_tweak_cache *tweak_cache,
+    const unsigned char *tweak32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
+/** Apply x-only tweaking to a public key in a given tweak_cache by adding the
+ *  generator multiplied with `tweak32` to it. This is useful for creating
+ *  Taproot outputs.
+ *
+ *  The tweaking method is the same as `secp256k1_xonly_pubkey_tweak_add`. So in
+ *  the following pseudocode xonly_pubkey_tweak_add_check (absent earlier
+ *  failures) returns 1.
+ *
+ *  secp256k1_frost_share_agg(..., agg_pk, ...)
+ *  secp256k1_frost_pubkey_tweak(..., tweak_cache, agg_pk)
+ *  secp256k1_frost_pubkey_xonly_tweak_add(..., output_pk, tweak_cache, tweak32)
+ *  secp256k1_xonly_pubkey_serialize(..., buf, output_pk)
+ *  secp256k1_xonly_pubkey_tweak_add_check(..., buf, ..., agg_pk, tweak32)
+ *
+ *  This function is required if you want to _sign_ for a tweaked aggregate key.
+ *  On the other hand, if you are only computing a public key, but not intending
+ *  to create a signature for it, you can just use
+ *  `secp256k1_xonly_pubkey_tweak_add`.
+ *
+ *  Returns: 0 if the arguments are invalid or the resulting public key would be
+ *           invalid (only when the tweak is the negation of the corresponding
+ *           secret key). 1 otherwise.
+ *  Args:            ctx: pointer to a context object initialized for verification
+ *  Out:   output_pubkey: pointer to a public key to store the result. Will be set
+ *                        to an invalid value if this function returns 0. If you
+ *                        do not need it, this arg can be NULL.
+ *  In/Out:  tweak_cache: pointer to a `frost_tweak_cache` struct initialized by
+ *                       `frost_pubkey_tweak`
+ *  In:          tweak32: pointer to a 32-byte tweak. If the tweak is invalid
+ *                        according to secp256k1_ec_seckey_verify, this function
+ *                        returns 0. For uniformly random 32-byte arrays the
+ *                        chance of being invalid is negligible (around 1 in
+ *                        2^128).
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_pubkey_xonly_tweak_add(
+    const secp256k1_context* ctx,
+    secp256k1_pubkey *output_pubkey,
+    secp256k1_frost_tweak_cache *tweak_cache,
+    const unsigned char *tweak32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
 /** Starts a signing session by generating a nonce
  *
  *  This function outputs a secret nonce that will be required for signing and a
@@ -263,8 +380,8 @@ SECP256K1_API int secp256k1_frost_share_agg(
  *     AND KEPT SECRET (even from other signers). If you do provide a seckey,
  *     session_id32 can instead be a counter (that must never repeat!). However,
  *     it is recommended to always choose session_id32 uniformly at random.
- *  2. If you already know the seckey, message or aggregate public key
- *     cache, they can be optionally provided to derive the nonce and increase
+ *  2. If you already know the seckey, message or aggregate public key, they
+ *     can be optionally provided to derive the nonce and increase
  *     misuse-resistance. The extra_input32 argument can be used to provide
  *     additional data that does not repeat in normal scenarios, such as the
  *     current time.
@@ -286,7 +403,7 @@ SECP256K1_API int secp256k1_frost_share_agg(
  *                     signing, if already known (can be NULL)
  *              msg32: the 32-byte message that will later be signed, if
  *                     already known (can be NULL)
- *             agg_pk: the FROST-aggregated public key
+ *             agg_pk: the FROST-aggregated public key (can be NULL)
  *      extra_input32: an optional 32-byte array that is input to the nonce
  *                     derivation function (can be NULL)
  */
@@ -317,6 +434,7 @@ SECP256K1_API int secp256k1_frost_nonce_gen(
  *                  pk: the public key of the participant who will use the
  *                      session for signing
  *             pubkeys: array of pointers to public keys of the signers
+ *         tweak_cache: pointer to frost_tweak_cache struct (can be NULL)
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_nonce_process(
     const secp256k1_context* ctx,
@@ -326,7 +444,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_nonce_process(
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
     const secp256k1_xonly_pubkey *pk,
-    const secp256k1_xonly_pubkey * const* pubkeys
+    const secp256k1_xonly_pubkey * const* pubkeys,
+    const secp256k1_frost_tweak_cache *tweak_cache
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8);
 
 /** Produces a partial signature
@@ -346,13 +465,15 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_nonce_process(
  *  In:     agg_share: the aggregated share
  *            session: pointer to the session that was created with
  *                     frost_nonce_process
+ *        tweak_cache: pointer to frost_tweak_cache struct (can be NULL)
  */
 SECP256K1_API int secp256k1_frost_partial_sign(
     const secp256k1_context* ctx,
     secp256k1_frost_partial_sig *partial_sig,
     secp256k1_frost_secnonce *secnonce,
     const secp256k1_frost_share *agg_share,
-    const secp256k1_frost_session *session
+    const secp256k1_frost_session *session,
+    const secp256k1_frost_tweak_cache *tweak_cache
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
 /** Verifies an individual signer's partial signature
@@ -384,13 +505,15 @@ SECP256K1_API int secp256k1_frost_partial_sign(
  *                    session
  *           session: pointer to the session that was created with
  *                    `frost_nonce_process`
+ *       tweak_cache: pointer to frost_tweak_cache struct (can be NULL)
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_partial_sig_verify(
     const secp256k1_context* ctx,
     const secp256k1_frost_partial_sig *partial_sig,
     const secp256k1_frost_pubnonce *pubnonce,
     const secp256k1_pubkey *share_pk,
-    const secp256k1_frost_session *session
+    const secp256k1_frost_session *session,
+    const secp256k1_frost_tweak_cache *tweak_cache
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
 /** Aggregates partial signatures
