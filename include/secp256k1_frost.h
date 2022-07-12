@@ -32,11 +32,11 @@ extern "C" {
 
 /** Opaque data structure that caches information about key tweaking.
  *
- *  Guaranteed to be 97 bytes in size. It can be safely copied/moved. No
+ *  Guaranteed to be 101 bytes in size. It can be safely copied/moved. No
  *  serialization and parsing functions (yet).
  */
 typedef struct {
-    unsigned char data[97];
+    unsigned char data[101];
 } secp256k1_frost_tweak_cache;
 
 /** Opaque data structure that holds the y-coordinate of a polynomial share.
