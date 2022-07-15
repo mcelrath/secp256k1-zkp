@@ -218,7 +218,7 @@ static int secp256k1_frost_pubkey_combine_callback(secp256k1_scalar *sc, secp256
     return secp256k1_pubkey_load(ctx->ctx, pt, &ctx->pks[idx][0]);
 }
 
-static int vss_verify(const secp256k1_context* ctx, size_t threshold, const secp256k1_xonly_pubkey *pk, const secp256k1_scalar *share, const secp256k1_pubkey * const* vss_commitment) {
+static int secp256k1_frost_vss_verify_internal(const secp256k1_context* ctx, size_t threshold, const secp256k1_xonly_pubkey *pk, const secp256k1_scalar *share, const secp256k1_pubkey * const* vss_commitment) {
     secp256k1_scalar share_neg;
     secp256k1_gej tmpj;
     secp256k1_frost_verify_share_ecmult_data verify_share_ecmult_data;
@@ -240,6 +240,18 @@ static int vss_verify(const secp256k1_context* ctx, size_t threshold, const secp
         return 0;
     }
     return secp256k1_gej_is_infinity(&tmpj);
+}
+
+int secp256k1_frost_vss_verify(const secp256k1_context* ctx, size_t threshold, const secp256k1_xonly_pubkey *pk, const secp256k1_frost_share *share, const secp256k1_pubkey * const* vss_commitment) {
+    secp256k1_scalar share_i;
+    int overflow;
+
+    secp256k1_scalar_set_b32(&share_i, share->data, &overflow);
+    if (overflow) {
+        return 0;
+    }
+
+    return secp256k1_frost_vss_verify_internal(ctx, threshold, pk, &share_i, vss_commitment);
 }
 
 int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_share *agg_share, secp256k1_pubkey *share_pk, secp256k1_xonly_pubkey *agg_pk, unsigned char *vss_hash, const secp256k1_frost_share * const* shares, const secp256k1_pubkey * const* vss_commitments, size_t n_shares, size_t threshold, const secp256k1_xonly_pubkey *pk) {
@@ -272,7 +284,7 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
         if (overflow) {
             return 0;
         }
-        if (!vss_verify(ctx, threshold, pk, &share_i, &vss_commitments[i])) {
+        if (!secp256k1_frost_vss_verify_internal(ctx, threshold, pk, &share_i, &vss_commitments[i])) {
             return 0;
         }
         secp256k1_scalar_add(&acc, &acc, &share_i);
