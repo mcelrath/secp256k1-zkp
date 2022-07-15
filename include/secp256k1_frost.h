@@ -186,23 +186,28 @@ SECP256K1_API int secp256k1_frost_partial_sig_parse(
     const unsigned char *in32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Derives a polynomial share and coefficient commitments
+/** Creates a key generation share and verifiable secret sharing ("VSS")
+ *  commitments.
  *
- *  The share is derived deterministically from the input parameters. The
- *  private key belonging to the keypair will be used as the first coefficient
- *  of the polynomial used to generate the shares and commitments.
+ *  The share is derived deterministically from the input parameters. TODO:
+ *  explain session_id, general usage, etc.
+ *
+ *  TODO: explicitly state the requirements on the communication channel, i.e.
+ *  the shares are supposed to be sent through secure (authenticated and
+ *  encrypted) channels to the other signers. Also, the vss_hashes must be
+ *  authentic, etc.
  *
  *  Returns: 0 if the arguments are invalid, 1 otherwise
  *  Args:            ctx: pointer to a context object initialized for
  *                        verification
  *  Out:  vss_commitment: the coefficient commitments. The length of this array
- *                        should be equal to the threshold (can be NULL).
+ *                        must be equal to the threshold (can be NULL).
  *                 share: pointer to the polynomial share
  *   In:    session_id32: a 32-byte session_id32 as explained above
- *               keypair: pointer to a keypair used to generate the polynomial
- *                        that derives the shares
+ *               keypair: pointer to a keypair that contains the secret that is
+ *                        shared
  *                    pk: pointer to the public key of the share recipient
- *             threshold: the minimum number of shares required to produce a
+ *             threshold: the minimum number of signers required to produce a
  *                        signature
  */
 SECP256K1_API int secp256k1_frost_share_gen(
@@ -219,14 +224,15 @@ SECP256K1_API int secp256k1_frost_share_gen(
  *
  *  As part of the key generation protocol, each participant receives a share
  *  from each participant, including a share they "receive" from themselves.
- *  This function verifies those shares against their verifiable secret sharing
- *  ("VSS") commitments, aggregates the shares, and then aggregates the
- *  commitments to each participant's first polynomial coefficient to derive
- *  the aggregate public key.
+ *  This function verifies those shares against their VSS commitments,
+ *  aggregates the shares, and then aggregates the commitments to each
+ *  participant's first polynomial coefficient to derive the aggregate public
+ *  key.
  *
- *  This function outputs a vss_hash, which is a sha256 image of coefficient
- *  commitments of all participants. vss_commitments must be sorted by participant
- *  index, otherwise the vss_hash generated will be invalid.
+ *  This function outputs a vss_hash, which is a sha256 image of the VSS of all
+ *  participants. vss_commitments must be sorted by the x-only pubkeys of the
+ *  participants, otherwise the vss_hash generated will be invalid. TODO: more
+ *  detail about how to sort and the next steps for the vss_hash
  *
  *  Returns: 0 if the arguments are invalid, 1 otherwise (which does NOT mean
  *           the resulting signature verifies).
