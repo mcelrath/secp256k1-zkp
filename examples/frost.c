@@ -292,19 +292,19 @@ int main(void) {
         }
     }
     printf("ok\n");
-    printf("Creating shares......");
+    printf("Creating shares.........");
     if (!create_shares(ctx, signer_secrets, signers, &agg_pk)) {
         printf("FAILED\n");
         return 1;
     }
     printf("ok\n");
-    printf("Signing VSS proofs......");
+    printf("Signing VSS.............");
     if (!sign_vss(ctx, signer_secrets, signers, sigs)) {
         printf("FAILED\n");
         return 1;
     }
     printf("ok\n");
-    printf("Verifying VSS proof signatures.....");
+    printf("Verifying VSS...........");
     for (i = 0; i < N_SIGNERS; i++) {
         if (!secp256k1_schnorrsig_verify(ctx, sigs[i], signers[0].vss_hash, 32, &signers[i].pubkey)) {
             printf("FAILED\n");
@@ -319,7 +319,7 @@ int main(void) {
         return 1;
     }
     printf("ok\n");
-    printf("Signing message with FROST.........");
+    printf("Signing message.........");
     if (!sign(ctx, signer_secrets, signers, msg, &agg_pk, sig, &cache)) {
         printf("FAILED\n");
         return 1;
