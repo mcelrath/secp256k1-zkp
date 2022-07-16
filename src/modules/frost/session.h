@@ -20,4 +20,7 @@ typedef struct {
     secp256k1_scalar s_part;
 } secp256k1_frost_session_internal;
 
+
+static int secp256k1_frost_session_load(const secp256k1_context* ctx, secp256k1_frost_session_internal *session_i, const secp256k1_frost_session *session);
+
 #endif

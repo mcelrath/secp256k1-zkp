@@ -237,7 +237,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
     /* Signing communication round 1: Exchange nonces */
     for (i = 0; i < THRESHOLD; i++) {
         signer_id = seed[i] % N_SIGNERS;
-        if (!secp256k1_frost_nonce_process(ctx, &signer[signer_id].session, pubnonces, THRESHOLD, msg32, agg_pk, &signer[signer_id].pubkey, pubkeys, cache)) {
+        if (!secp256k1_frost_nonce_process(ctx, &signer[signer_id].session, pubnonces, THRESHOLD, msg32, agg_pk, &signer[signer_id].pubkey, pubkeys, cache, NULL)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it to 0. That's because

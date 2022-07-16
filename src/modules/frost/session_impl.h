@@ -16,9 +16,6 @@
 #include "keygen.h"
 #include "session.h"
 #include "../../eckey.h"
-#include "../../ecmult.h"
-#include "../../field.h"
-#include "../../group.h"
 #include "../../hash.h"
 #include "../../scalar.h"
 #include "../../util.h"
@@ -418,7 +415,7 @@ static int secp256k1_frost_lagrange_coefficient(const secp256k1_context* ctx, se
     return 1;
 }
 
-int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_session *session, const secp256k1_frost_pubnonce * const* pubnonces, size_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const secp256k1_xonly_pubkey *pk, const secp256k1_xonly_pubkey * const* pubkeys, const secp256k1_frost_tweak_cache *tweak_cache) {
+int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_session *session, const secp256k1_frost_pubnonce * const* pubnonces, size_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const secp256k1_xonly_pubkey *pk, const secp256k1_xonly_pubkey * const* pubkeys, const secp256k1_frost_tweak_cache *tweak_cache, const secp256k1_pubkey *adaptor) {
     secp256k1_ge aggnonce_pt[2];
     secp256k1_gej aggnonce_ptj[2];
     unsigned char fin_nonce[32];
@@ -461,6 +458,14 @@ int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_
         } else {
             secp256k1_ge_set_gej(&aggnonce_pt[i], &aggnonce_ptj[i]);
         }
+    }
+    /* Add public adaptor to nonce */
+    if (adaptor != NULL) {
+        secp256k1_ge adaptorp;
+        if (!secp256k1_pubkey_load(ctx, &adaptorp, adaptor)) {
+            return 0;
+        }
+        secp256k1_gej_add_ge_var(&aggnonce_ptj[0], &aggnonce_ptj[0], &adaptorp, NULL);
     }
     if (!secp256k1_frost_nonce_process_internal(ctx, &session_i.fin_nonce_parity, fin_nonce, &session_i.noncecoef, aggnonce_ptj, msg32, pubnonces, n_pubnonces)) {
         return 0;
