@@ -239,7 +239,6 @@ SECP256K1_API int secp256k1_frost_share_gen(
  *           the resulting signature verifies).
  *  Args:         ctx: pointer to a context object
  *  Out:    agg_share: the aggregated share
- *           share_pk: the public verification share of the aggregated share
  *             agg_pk: the aggregated x-only public key
  *           vss_hash: sha256 image of the coefficient commitments
  *  In:        shares: all polynomial shares for the partcipant's index
@@ -254,7 +253,6 @@ SECP256K1_API int secp256k1_frost_share_gen(
 SECP256K1_API int secp256k1_frost_share_agg(
     const secp256k1_context* ctx,
     secp256k1_frost_share *agg_share,
-    secp256k1_pubkey *share_pk,
     secp256k1_xonly_pubkey *agg_pk,
     unsigned char *vss_hash,
     const secp256k1_frost_share * const* shares,
@@ -262,7 +260,7 @@ SECP256K1_API int secp256k1_frost_share_agg(
     size_t n_shares,
     size_t threshold,
     const secp256k1_xonly_pubkey *pk
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(10);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(9);
 
 /* TODO: add comment explaining function */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_vss_verify(
@@ -381,6 +379,16 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_pubkey_xonly_twea
     secp256k1_frost_tweak_cache *tweak_cache,
     const unsigned char *tweak32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
+/* TODO: comment */
+SECP256K1_API int secp256k1_frost_compute_pubshare(
+    const secp256k1_context* ctx,
+    secp256k1_pubkey *pubshare,
+    size_t threshold,
+    const secp256k1_xonly_pubkey *pk,
+    const secp256k1_pubkey * const* vss_commitments,
+    size_t n_participants
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(5);
 
 /** Starts a signing session by generating a nonce
  *

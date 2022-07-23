@@ -108,7 +108,10 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
             assigned_shares[j] = &shares[j][i];
         }
         /* Each participant aggregates the shares they received. */
-        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, &signer[i].share_pk, agg_pk, signer[i].vss_hash, assigned_shares, vss_commitments, N_SIGNERS, THRESHOLD, &signer[i].pubkey)) {
+        if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, agg_pk, signer[i].vss_hash, assigned_shares, vss_commitments, N_SIGNERS, THRESHOLD, &signer[i].pubkey)) {
+            return 0;
+        }
+        if (!secp256k1_frost_compute_pubshare(ctx, &signer[i].share_pk, THRESHOLD, &signer[i].pubkey, vss_commitments, N_SIGNERS)) {
             return 0;
         }
     }
