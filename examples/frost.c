@@ -111,8 +111,15 @@ int create_shares(const secp256k1_context* ctx, struct signer_secrets *signer_se
         if (!secp256k1_frost_share_agg(ctx, &signer_secrets[i].agg_share, agg_pk, signer[i].vss_hash, assigned_shares, vss_commitments, N_SIGNERS, THRESHOLD, &signer[i].pubkey)) {
             return 0;
         }
-        if (!secp256k1_frost_compute_pubshare(ctx, &signer[i].share_pk, THRESHOLD, &signer[i].pubkey, vss_commitments, N_SIGNERS)) {
-            return 0;
+        for (j = 0; j < N_SIGNERS; j++) {
+            /* TODO: comment */
+            if (!secp256k1_frost_share_verify(ctx, THRESHOLD, &signer[i].pubkey, assigned_shares[j], &vss_commitments[j])) {
+                return 0;
+            }
+            /* TODO: comment */
+            if (!secp256k1_frost_compute_pubshare(ctx, &signer[j].share_pk, THRESHOLD, &signer[j].pubkey, vss_commitments, N_SIGNERS)) {
+                return 0;
+            }
         }
     }
 

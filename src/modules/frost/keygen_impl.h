@@ -265,7 +265,7 @@ static int secp256k1_frost_vss_verify_internal(const secp256k1_context* ctx, siz
     return secp256k1_gej_is_infinity(&tmpj);
 }
 
-int secp256k1_frost_vss_verify(const secp256k1_context* ctx, size_t threshold, const secp256k1_xonly_pubkey *pk, const secp256k1_frost_share *share, const secp256k1_pubkey * const* vss_commitment) {
+int secp256k1_frost_share_verify(const secp256k1_context* ctx, size_t threshold, const secp256k1_xonly_pubkey *pk, const secp256k1_frost_share *share, const secp256k1_pubkey * const* vss_commitment) {
     secp256k1_scalar share_i;
     int overflow;
 
@@ -278,6 +278,7 @@ int secp256k1_frost_vss_verify(const secp256k1_context* ctx, size_t threshold, c
 }
 
 int secp256k1_frost_compute_pubshare(const secp256k1_context* ctx, secp256k1_pubkey *pubshare, size_t threshold, const secp256k1_xonly_pubkey *pk, const secp256k1_pubkey * const* vss_commitments, size_t n_participants) {
+    /* TODO: validate inputs */
     secp256k1_gej pkj;
     secp256k1_ge pkp, tmp;
     secp256k1_frost_compute_pubshare_ecmult_data compute_pubshare_ecmult_data;

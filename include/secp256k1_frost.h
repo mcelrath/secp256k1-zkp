@@ -233,7 +233,7 @@ SECP256K1_API int secp256k1_frost_share_gen(
  *  participants. vss_commitments must be sorted by the x-only pubkeys of the
  *  participants, otherwise the vss_hash generated will be invalid. TODO: more
  *  detail about how to sort and the next steps for the vss_hash; how to handle
- *  failure with vss_verify
+ *  failure with share_verify
  *
  *  Returns: 0 if the arguments are invalid, 1 otherwise (which does NOT mean
  *           the resulting signature verifies).
@@ -263,7 +263,7 @@ SECP256K1_API int secp256k1_frost_share_agg(
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(9);
 
 /* TODO: add comment explaining function */
-SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_vss_verify(
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_frost_share_verify(
     const secp256k1_context* ctx,
     size_t threshold,
     const secp256k1_xonly_pubkey *pk,
@@ -388,7 +388,7 @@ SECP256K1_API int secp256k1_frost_compute_pubshare(
     const secp256k1_xonly_pubkey *pk,
     const secp256k1_pubkey * const* vss_commitments,
     size_t n_participants
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(5);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
 /** Starts a signing session by generating a nonce
  *
