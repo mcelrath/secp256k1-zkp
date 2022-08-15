@@ -90,9 +90,11 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    VERIFY_CHECK(share != NULL);
-    VERIFY_CHECK(keypair != NULL);
-    VERIFY_CHECK(pk != NULL);
+    ARG_CHECK(share != NULL);
+    memset(share, 0, sizeof(*share));
+    ARG_CHECK(session_id != NULL);
+    ARG_CHECK(keypair != NULL);
+    ARG_CHECK(pk != NULL);
     ARG_CHECK(threshold > 1);
 
     if (!secp256k1_keypair_load(ctx, &sk, &ge_tmp, keypair)) {
