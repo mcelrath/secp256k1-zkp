@@ -75,6 +75,46 @@ static int secp256k1_frost_compute_indexhash(const secp256k1_context *ctx, secp2
     return 1;
 }
 
+static const unsigned char secp256k1_frost_share_magic[4] = { 0xa1, 0x6a, 0x42, 0x03 };
+
+static void secp256k1_frost_share_save(secp256k1_frost_share* share, secp256k1_scalar *s) {
+    memcpy(&share->data[0], secp256k1_frost_share_magic, 4);
+    secp256k1_scalar_get_b32(&share->data[4], s);
+}
+
+static int secp256k1_frost_share_load(const secp256k1_context* ctx, secp256k1_scalar *s, const secp256k1_frost_share* share) {
+    int overflow;
+
+    ARG_CHECK(secp256k1_memcmp_var(&share->data[0], secp256k1_frost_share_magic, 4) == 0);
+    secp256k1_scalar_set_b32(s, &share->data[4], &overflow);
+    /* Parsed shares cannot overflow */
+    VERIFY_CHECK(!overflow);
+    return 1;
+}
+
+int secp256k1_frost_share_serialize(const secp256k1_context* ctx, unsigned char *out32, const secp256k1_frost_share* share) {
+    VERIFY_CHECK(ctx != NULL);
+    VERIFY_CHECK(out32 != NULL);
+    VERIFY_CHECK(share != NULL);
+    memcpy(out32, &share->data[4], 32);
+    return 1;
+}
+
+int secp256k1_frost_share_parse(const secp256k1_context* ctx, secp256k1_frost_share* share, const unsigned char *in32) {
+    secp256k1_scalar tmp;
+    int overflow;
+    VERIFY_CHECK(ctx != NULL);
+    VERIFY_CHECK(share != NULL);
+    VERIFY_CHECK(in32 != NULL);
+
+    secp256k1_scalar_set_b32(&tmp, in32, &overflow);
+    if (overflow) {
+        return 0;
+    }
+    secp256k1_frost_share_save(share, &tmp);
+    return 1;
+}
+
 /* Generate polynomial coefficients, coefficient commitments, and a share, from */
 /* a seed and a secret key. */
 int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vss_commitment, secp256k1_frost_share *share, const unsigned char *session_id, const secp256k1_keypair *keypair, const secp256k1_xonly_pubkey *pk, size_t threshold) {
@@ -145,7 +185,7 @@ int secp256k1_frost_share_gen(const secp256k1_context *ctx, secp256k1_pubkey *vs
         secp256k1_scalar_mul(&share_i, &share_i, &idx);
     }
     secp256k1_scalar_add(&share_i, &share_i, &sk);
-    secp256k1_scalar_get_b32(share->data, &share_i);
+    secp256k1_frost_share_save(share, &share_i);
 
     return 1;
 }
@@ -269,10 +309,8 @@ static int secp256k1_frost_vss_verify_internal(const secp256k1_context* ctx, siz
 
 int secp256k1_frost_share_verify(const secp256k1_context* ctx, size_t threshold, const secp256k1_xonly_pubkey *pk, const secp256k1_frost_share *share, const secp256k1_pubkey * const* vss_commitment) {
     secp256k1_scalar share_i;
-    int overflow;
 
-    secp256k1_scalar_set_b32(&share_i, share->data, &overflow);
-    if (overflow) {
+    if (!secp256k1_frost_share_load(ctx, &share_i, share)) {
         return 0;
     }
 
@@ -336,14 +374,15 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     int pk_parity;
     secp256k1_scalar acc;
     size_t i;
-    int overflow;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(agg_share != NULL);
-    VERIFY_CHECK(agg_pk != NULL);
-    VERIFY_CHECK(vss_hash != NULL);
-    VERIFY_CHECK(shares != NULL);
-    VERIFY_CHECK(vss_commitments != NULL);
+    ARG_CHECK(agg_share != NULL);
+    memset(agg_share, 0, sizeof(*agg_share));
+    ARG_CHECK(agg_pk != NULL);
+    memset(agg_pk, 0, sizeof(*agg_pk));
+    ARG_CHECK(vss_hash != NULL);
+    ARG_CHECK(shares != NULL);
+    ARG_CHECK(vss_commitments != NULL);
     ARG_CHECK(n_shares > 1);
     ARG_CHECK(threshold > 1);
 
@@ -355,8 +394,7 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     for (i = 0; i < n_shares; i++) {
         secp256k1_scalar share_i;
 
-        secp256k1_scalar_set_b32(&share_i, shares[i]->data, &overflow);
-        if (overflow) {
+        if (!secp256k1_frost_share_load(ctx, &share_i, shares[i])) {
             return 0;
         }
         if (!secp256k1_frost_vss_verify_internal(ctx, threshold, pk, &share_i, &vss_commitments[i])) {
@@ -387,7 +425,7 @@ int secp256k1_frost_share_agg(const secp256k1_context* ctx, secp256k1_frost_shar
     if (pk_parity == 1) {
         secp256k1_scalar_negate(&acc, &acc);
     }
-    secp256k1_scalar_get_b32((unsigned char *) agg_share->data, &acc);
+    secp256k1_frost_share_save(agg_share, &acc);
 
     return 1;
 }

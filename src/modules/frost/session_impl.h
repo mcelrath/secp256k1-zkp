@@ -284,7 +284,7 @@ int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secn
     /* Check that the agg_share is valid to be able to sign for it later. */
     if (agg_share != NULL) {
         secp256k1_scalar sk;
-        ret &= secp256k1_scalar_set_b32_seckey(&sk, agg_share->data);
+        ret &= secp256k1_frost_share_load(ctx, &sk, agg_share);
         secp256k1_scalar_clear(&sk);
     }
 
@@ -296,7 +296,7 @@ int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secn
         VERIFY_CHECK(ret_tmp);
         pk_ser_ptr = pk_ser;
     }
-    secp256k1_nonce_function_frost(k, session_id32, msg32, agg_share->data, pk_ser_ptr, extra_input32);
+    secp256k1_nonce_function_frost(k, session_id32, msg32, &agg_share->data[4], pk_ser_ptr, extra_input32);
     VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[0]));
     VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[1]));
     VERIFY_CHECK(!secp256k1_scalar_eq(&k[0], &k[1]));
@@ -512,7 +512,6 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
     secp256k1_scalar s;
     secp256k1_frost_session_internal session_i;
     int ret;
-    int overflow;
 
     VERIFY_CHECK(ctx != NULL);
 
@@ -531,8 +530,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
     VERIFY_CHECK(agg_share != NULL);
     VERIFY_CHECK(session != NULL);
 
-    secp256k1_scalar_set_b32(&sk, agg_share->data, &overflow);
-    if (overflow) {
+    if (!secp256k1_frost_share_load(ctx, &sk, agg_share)) {
         secp256k1_frost_partial_sign_clear(&sk, k);
         return 0;
     }

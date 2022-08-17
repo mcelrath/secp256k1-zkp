@@ -39,12 +39,13 @@ typedef struct {
     unsigned char data[101];
 } secp256k1_frost_tweak_cache;
 
-/** Opaque data structure that holds the y-coordinate of a polynomial share.
+/** Opaque data structure that holds a signer's _secret_ share.
  *
- *  Guaranteed to be 32 bytes in size. It can be safely copied/moved.
+ *  Guaranteed to be 36 bytes in size. Serialized and parsed with
+ *  `frost_share_serialize` and `frost_share_parse`.
  */
 typedef struct {
-    unsigned char data[32];
+    unsigned char data[36];
 } secp256k1_frost_share;
 
 /** Opaque data structure that holds a signer's _secret_ nonce.
@@ -183,6 +184,32 @@ SECP256K1_API int secp256k1_frost_partial_sig_serialize(
 SECP256K1_API int secp256k1_frost_partial_sig_parse(
     const secp256k1_context* ctx,
     secp256k1_frost_partial_sig* sig,
+    const unsigned char *in32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Serialize a FROST share
+ *
+ *  Returns: 1 when the share could be serialized, 0 otherwise
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   out32: pointer to a 32-byte array to store the serialized share
+ *  In:    share: pointer to the share
+ */
+SECP256K1_API int secp256k1_frost_share_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out32,
+    const secp256k1_frost_share* share
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Parse a FROST share.
+ *
+ *  Returns: 1 when the share could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   share: pointer to a share object
+ *  In:     in32: pointer to the 32-byte share to be parsed
+ */
+SECP256K1_API int secp256k1_frost_share_parse(
+    const secp256k1_context* ctx,
+    secp256k1_frost_share* share,
     const unsigned char *in32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
