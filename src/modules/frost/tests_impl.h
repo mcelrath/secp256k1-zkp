@@ -131,10 +131,7 @@ int frost_memcmp_and_randomize(unsigned char *value, const unsigned char *expect
 }
 
 void frost_api_tests(void) {
-    secp256k1_frost_partial_sig partial_sig[5];
-    const secp256k1_frost_partial_sig *partial_sig_ptr[5];
     secp256k1_frost_partial_sig invalid_partial_sig;
-    const secp256k1_frost_partial_sig *invalid_partial_sig_ptr[5];
     unsigned char sk[5][32];
     secp256k1_keypair keypair[5];
     secp256k1_keypair invalid_keypair;
@@ -142,12 +139,8 @@ void frost_api_tests(void) {
     unsigned char zeros68[68] = { 0 };
     unsigned char session_id[5][32];
     secp256k1_frost_secnonce invalid_secnonce;
-    secp256k1_frost_pubnonce pubnonce[5];
-    const secp256k1_frost_pubnonce *pubnonce_ptr[5];
     secp256k1_frost_pubnonce inf_pubnonce[5];
-    const secp256k1_frost_pubnonce *inf_pubnonce_ptr[5];
     secp256k1_frost_pubnonce invalid_pubnonce;
-    const secp256k1_frost_pubnonce *invalid_pubnonce_ptr[1];
     unsigned char msg[32];
     secp256k1_xonly_pubkey agg_pk;
     secp256k1_pubkey full_agg_pk;
@@ -209,18 +202,12 @@ void frost_api_tests(void) {
     CHECK(secp256k1_ec_pubkey_create(ctx, &adaptor, sec_adaptor) == 1);
     for (i = 0; i < 5; i++) {
         pk_ptr[i] = &pk[i];
-        pubnonce_ptr[i] = &pubnonce[i];
-        inf_pubnonce_ptr[i] = &inf_pubnonce[i];
-        partial_sig_ptr[i] = &partial_sig[i];
-        invalid_partial_sig_ptr[i] = &partial_sig[i];
         vss_ptr[i] = vss_commitment[i];
         invalid_vss_ptr[i] = invalid_vss_commitment[i];
         secp256k1_testrand256(session_id[i]);
         secp256k1_testrand256(sk[i]);
         CHECK(create_keypair_and_pk(&keypair[i], &pk[i], sk[i]));
     }
-    invalid_pubnonce_ptr[0] = &invalid_pubnonce;
-    invalid_partial_sig_ptr[0] = &invalid_partial_sig;
     invalid_share_ptr[0] = &invalid_share;
     for (i = 0; i < 5; i++) {
         for (j = 0; j < 3; j++) {
