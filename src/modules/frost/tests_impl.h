@@ -150,6 +150,9 @@ void frost_api_tests(void) {
     const secp256k1_frost_pubnonce *invalid_pubnonce_ptr[1];
     unsigned char msg[32];
     secp256k1_xonly_pubkey agg_pk;
+    secp256k1_pubkey full_agg_pk;
+    secp256k1_frost_tweak_cache tweak_cache;
+    secp256k1_frost_tweak_cache invalid_tweak_cache;
     secp256k1_xonly_pubkey pk[5];
     const secp256k1_xonly_pubkey *pk_ptr[5];
     secp256k1_xonly_pubkey invalid_pk;
@@ -197,6 +200,7 @@ void frost_api_tests(void) {
     memset(&invalid_partial_sig, 0, sizeof(invalid_partial_sig));
     memset(&invalid_pubnonce, 0, sizeof(invalid_pubnonce));
     memset(&invalid_vss_pk, 0, sizeof(invalid_vss_pk));
+    memset(&invalid_tweak_cache, 0, sizeof(invalid_tweak_cache));
     frost_pubnonce_summing_to_inf(inf_pubnonce);
 
     secp256k1_testrand256(sec_adaptor);
@@ -387,6 +391,73 @@ void frost_api_tests(void) {
     CHECK(secp256k1_frost_compute_pubshare(none, &share_pk, 3, pk_ptr[0], vss_ptr, 5) == 1);
     CHECK(secp256k1_frost_compute_pubshare(sign, &share_pk, 3, pk_ptr[0], vss_ptr, 5) == 1);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 3, pk_ptr[0], vss_ptr, 5) == 1);
+
+    /* pubkey_get */
+    ecount = 0;
+    CHECK(secp256k1_frost_pubkey_get(none, &full_agg_pk, &agg_pk) == 1);
+    CHECK(secp256k1_frost_pubkey_get(none, NULL, &agg_pk) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_frost_pubkey_get(none, &full_agg_pk, NULL) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_memcmp_var(&full_agg_pk, zeros68, sizeof(full_agg_pk)) == 0);
+
+    /** Tweaking **/
+
+    /* pubkey_tweak */
+    ecount = 0;
+    CHECK(secp256k1_frost_pubkey_tweak(none, &tweak_cache, &agg_pk) == 1);
+    CHECK(secp256k1_frost_pubkey_tweak(sign, &tweak_cache, &agg_pk) == 1);
+    CHECK(secp256k1_frost_pubkey_tweak(vrfy, &tweak_cache, &agg_pk) == 1);
+    CHECK(secp256k1_frost_pubkey_tweak(vrfy, NULL, &agg_pk) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_frost_pubkey_tweak(vrfy, &tweak_cache, NULL) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_frost_pubkey_tweak(vrfy, &tweak_cache, &invalid_pk) == 0);
+    CHECK(ecount == 3);
+
+    CHECK(secp256k1_frost_pubkey_tweak(none, &tweak_cache, &agg_pk) == 1);
+    CHECK(secp256k1_frost_pubkey_tweak(sign, &tweak_cache, &agg_pk) == 1);
+    CHECK(secp256k1_frost_pubkey_tweak(vrfy, &tweak_cache, &agg_pk) == 1);
+
+    /* tweak_add */
+    {
+        int (*tweak_func[2]) (const secp256k1_context* ctx, secp256k1_pubkey *output_pubkey, secp256k1_frost_tweak_cache *tweak_cache, const unsigned char *tweak32);
+        tweak_func[0] = secp256k1_frost_pubkey_ec_tweak_add;
+        tweak_func[1] = secp256k1_frost_pubkey_xonly_tweak_add;
+        CHECK(secp256k1_frost_pubkey_tweak(ctx, &tweak_cache, &agg_pk) == 1);
+        for (i = 0; i < 2; i++) {
+            secp256k1_pubkey tmp_output_pk;
+            secp256k1_frost_tweak_cache tmp_tweak_cache = tweak_cache;
+            ecount = 0;
+            CHECK((*tweak_func[i])(ctx, &tmp_output_pk, &tmp_tweak_cache, tweak) == 1);
+            /* Reset tweak_cache */
+            tmp_tweak_cache = tweak_cache;
+            CHECK((*tweak_func[i])(none, &tmp_output_pk, &tmp_tweak_cache, tweak) == 1);
+            tmp_tweak_cache = tweak_cache;
+            CHECK((*tweak_func[i])(sign, &tmp_output_pk, &tmp_tweak_cache, tweak) == 1);
+            tmp_tweak_cache = tweak_cache;
+            CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, &tmp_tweak_cache, tweak) == 1);
+            tmp_tweak_cache = tweak_cache;
+            CHECK((*tweak_func[i])(vrfy, NULL, &tmp_tweak_cache, tweak) == 1);
+            tmp_tweak_cache = tweak_cache;
+            CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, NULL, tweak) == 0);
+            CHECK(ecount == 1);
+            CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
+            tmp_tweak_cache = tweak_cache;
+            CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, &tmp_tweak_cache, NULL) == 0);
+            CHECK(ecount == 2);
+            CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
+            tmp_tweak_cache = tweak_cache;
+            CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, &tmp_tweak_cache, max64) == 0);
+            CHECK(ecount == 2);
+            CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
+            tmp_tweak_cache = tweak_cache;
+            /* Uninitialized tweak_cache */
+            CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, &invalid_tweak_cache, tweak) == 0);
+            CHECK(ecount == 3);
+            CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
+        }
+    }
 }
 
 void run_frost_tests(void) {
