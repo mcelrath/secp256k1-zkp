@@ -445,6 +445,12 @@ void frost_api_tests(void) {
             CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
         }
     }
+
+    /** cleanup **/
+    secp256k1_context_destroy(none);
+    secp256k1_context_destroy(sign);
+    secp256k1_context_destroy(vrfy);
+    secp256k1_context_destroy(sttc);
 }
 
 void run_frost_tests(void) {
