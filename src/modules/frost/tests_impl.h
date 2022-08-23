@@ -138,7 +138,9 @@ void frost_api_tests(void) {
     unsigned char max64[64];
     unsigned char zeros68[68] = { 0 };
     unsigned char session_id[5][32];
+    secp256k1_frost_secnonce secnonce[5];
     secp256k1_frost_secnonce invalid_secnonce;
+    secp256k1_frost_pubnonce pubnonce[5];
     secp256k1_frost_pubnonce inf_pubnonce[5];
     secp256k1_frost_pubnonce invalid_pubnonce;
     unsigned char msg[32];
@@ -229,22 +231,22 @@ void frost_api_tests(void) {
             CHECK(ecount == (i*35)+(j*7)+1);
             CHECK(secp256k1_frost_share_gen(vrfy, vss_commitment[i], &share[i][j], NULL, &keypair[i], pk_ptr[j], 3) == 0);
             CHECK(ecount == (i*35)+(j*7)+2);
-            CHECK(memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
+            CHECK(frost_memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
             CHECK(secp256k1_frost_share_gen(vrfy, vss_commitment[i], &share[i][j], session_id[i], NULL, pk_ptr[j], 3) == 0);
             CHECK(ecount == (i*35)+(j*7)+3);
-            CHECK(memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
+            CHECK(frost_memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
             CHECK(secp256k1_frost_share_gen(vrfy, vss_commitment[i], &share[i][j], session_id[i], &keypair[i], NULL, 3) == 0);
             CHECK(ecount == (i*35)+(j*7)+4);
-            CHECK(memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
+            CHECK(frost_memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
             CHECK(secp256k1_frost_share_gen(vrfy, vss_commitment[i], &share[i][j], session_id[i], &keypair[i], &invalid_pk, 3) == 0);
             CHECK(ecount == (i*35)+(j*7)+5);
-            CHECK(memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
+            CHECK(frost_memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
             CHECK(secp256k1_frost_share_gen(vrfy, vss_commitment[i], &share[i][j], session_id[i], &keypair[i], pk_ptr[j], 0) == 0);
             CHECK(ecount == (i*35)+(j*7)+6);
-            CHECK(memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
+            CHECK(frost_memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
             CHECK(secp256k1_frost_share_gen(vrfy, NULL, &share[i][j], session_id[i], &keypair[i], pk_ptr[j], 0) == 0);
             CHECK(ecount == (i*35)+(j*7)+7);
-            CHECK(memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
+            CHECK(frost_memcmp_and_randomize(share[i][j].data, zeros68, sizeof(share[i][j].data)) == 0);
 
             CHECK(secp256k1_frost_share_gen(none, vss_commitment[i], &share[i][j], session_id[i], &keypair[i], pk_ptr[j], 3) == 1);
             CHECK(secp256k1_frost_share_gen(sign, vss_commitment[i], &share[i][j], session_id[i], &keypair[i], pk_ptr[j], 3) == 1);
@@ -266,56 +268,57 @@ void frost_api_tests(void) {
         CHECK(ecount == (i*13)+1);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], NULL, vss_hash, share_ptr, vss_ptr, 5, 3, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+2);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, NULL, share_ptr, vss_ptr, 5, 3, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+3);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, NULL, vss_ptr, 5, 3, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+4);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, share_ptr, NULL, 5, 3, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+5);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, share_ptr, invalid_vss_ptr, 5, 3, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+6);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, share_ptr, vss_ptr, 5, 3, NULL) == 0);
         CHECK(ecount == (i*13)+7);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, share_ptr, vss_ptr, 5, 3, &invalid_pk) == 0);
         CHECK(ecount == (i*13)+8);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, invalid_share_ptr, vss_ptr, 5, 3, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+9);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, share_ptr, vss_ptr, 0, 3, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+10);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, NULL, vss_ptr, 0, 3, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+11);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, share_ptr, vss_ptr, 5, 0, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+12);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, share_ptr, NULL, 5, 0, pk_ptr[i]) == 0);
         CHECK(ecount == (i*13)+13);
-        CHECK(memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
-        CHECK(memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_share[i].data, zeros68, sizeof(agg_share[i].data)) == 0);
+        CHECK(frost_memcmp_and_randomize(agg_pk.data, zeros68, sizeof(agg_pk.data)) == 0);
 
         CHECK(secp256k1_frost_share_agg(none, &agg_share[i], &agg_pk, vss_hash, share_ptr, vss_ptr, 5, 3, pk_ptr[i]) == 1);
         CHECK(secp256k1_frost_share_agg(sign, &agg_share[i], &agg_pk, vss_hash, share_ptr, vss_ptr, 5, 3, pk_ptr[i]) == 1);
         CHECK(secp256k1_frost_share_agg(vrfy, &agg_share[i], &agg_pk, vss_hash, share_ptr, vss_ptr, 5, 3, pk_ptr[i]) == 1);
     }
+    CHECK(ecount == 65);
 
     /* Share verification */
     ecount = 0;
@@ -352,28 +355,28 @@ void frost_api_tests(void) {
     CHECK(ecount == 1);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 3, NULL, vss_ptr, 5) == 0);
     CHECK(ecount == 2);
-    CHECK(memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
+    CHECK(frost_memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 3, &invalid_pk, vss_ptr, 5) == 0);
     CHECK(ecount == 3);
-    CHECK(memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
+    CHECK(frost_memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 3, pk_ptr[0], NULL, 5) == 0);
     CHECK(ecount == 4);
-    CHECK(memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
+    CHECK(frost_memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 3, pk_ptr[0], invalid_vss_ptr, 5) == 0);
     CHECK(ecount == 5);
-    CHECK(memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
+    CHECK(frost_memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 0, pk_ptr[0], invalid_vss_ptr, 5) == 0);
     CHECK(ecount == 6);
-    CHECK(memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
+    CHECK(frost_memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 0, pk_ptr[0], NULL, 5) == 0);
     CHECK(ecount == 7);
-    CHECK(memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
+    CHECK(frost_memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 3, pk_ptr[0], invalid_vss_ptr, 0) == 0);
     CHECK(ecount == 8);
-    CHECK(memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
+    CHECK(frost_memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
     CHECK(secp256k1_frost_compute_pubshare(vrfy, &share_pk, 3, pk_ptr[0], NULL, 0) == 0);
     CHECK(ecount == 9);
-    CHECK(memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
+    CHECK(frost_memcmp_and_randomize(share_pk.data, zeros68, sizeof(share_pk.data)) == 0);
 
     CHECK(secp256k1_frost_compute_pubshare(none, &share_pk, 3, pk_ptr[0], vss_ptr, 5) == 1);
     CHECK(secp256k1_frost_compute_pubshare(sign, &share_pk, 3, pk_ptr[0], vss_ptr, 5) == 1);
@@ -429,22 +432,63 @@ void frost_api_tests(void) {
             tmp_tweak_cache = tweak_cache;
             CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, NULL, tweak) == 0);
             CHECK(ecount == 1);
-            CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
+            CHECK(frost_memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
             tmp_tweak_cache = tweak_cache;
             CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, &tmp_tweak_cache, NULL) == 0);
             CHECK(ecount == 2);
-            CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
+            CHECK(frost_memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
             tmp_tweak_cache = tweak_cache;
             CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, &tmp_tweak_cache, max64) == 0);
             CHECK(ecount == 2);
-            CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
+            CHECK(frost_memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
             tmp_tweak_cache = tweak_cache;
             /* Uninitialized tweak_cache */
             CHECK((*tweak_func[i])(vrfy, &tmp_output_pk, &invalid_tweak_cache, tweak) == 0);
             CHECK(ecount == 3);
-            CHECK(memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
+            CHECK(frost_memcmp_and_randomize(tmp_output_pk.data, zeros68, sizeof(tmp_output_pk.data)) == 0);
         }
     }
+
+    /** Session creation **/
+    ecount = 0;
+    CHECK(secp256k1_frost_nonce_gen(none, &secnonce[0], &pubnonce[0], session_id[0], &agg_share[0], msg, &agg_pk, max64) == 1);
+    CHECK(secp256k1_frost_nonce_gen(vrfy, &secnonce[0], &pubnonce[0], session_id[0], &agg_share[0], msg, &agg_pk, max64) == 1);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], &agg_share[0], msg, &agg_pk, max64) == 1);
+    CHECK(ecount == 0);
+    CHECK(secp256k1_frost_nonce_gen(sttc, &secnonce[0], &pubnonce[0], session_id[0], &agg_share[0], msg, &agg_pk, max64) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_frost_nonce_gen(sign, NULL, &pubnonce[0], session_id[0], &agg_share[0], msg, &agg_pk, max64) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], NULL, session_id[0], &agg_share[0], msg, &agg_pk, max64) == 0);
+    CHECK(ecount == 3);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], NULL, &agg_share[0], msg, &agg_pk, max64) == 0);
+    CHECK(ecount == 4);
+    CHECK(frost_memcmp_and_randomize(secnonce[0].data, zeros68, sizeof(secnonce[0].data)) == 0);
+    /* no seckey and session_id is 0 */
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], zeros68, NULL, msg, &agg_pk, max64) == 0);
+    CHECK(ecount == 4);
+    CHECK(frost_memcmp_and_randomize(secnonce[0].data, zeros68, sizeof(secnonce[0].data)) == 0);
+    /* session_id 0 is fine when a seckey is provided */
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], zeros68, &agg_share[0], msg, &agg_pk, max64) == 1);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], NULL, msg, &agg_pk, max64) == 1);
+    CHECK(ecount == 4);
+    /* invalid agg_share */
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], &invalid_share, msg, &agg_pk, max64) == 0);
+    CHECK(frost_memcmp_and_randomize(secnonce[0].data, zeros68, sizeof(secnonce[0].data)) == 0);
+    CHECK(ecount == 5);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], &agg_share[0], NULL, &agg_pk, max64) == 1);
+    CHECK(ecount == 5);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], &agg_share[0], msg, NULL, max64) == 1);
+    CHECK(ecount == 5);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], &agg_share[0], msg, &invalid_pk, max64) == 0);
+    CHECK(ecount == 6);
+    CHECK(frost_memcmp_and_randomize(secnonce[0].data, zeros68, sizeof(secnonce[0].data)) == 0);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], &agg_share[0], msg, &agg_pk, NULL) == 1);
+    CHECK(ecount == 6);
+
+    /* Every in-argument except session_id can be NULL */
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], NULL, NULL, NULL, NULL) == 1);
+    CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[1], &pubnonce[1], session_id[1], &agg_share[1], NULL, NULL, NULL) == 1);
 
     /** cleanup **/
     secp256k1_context_destroy(none);
