@@ -94,8 +94,8 @@ static int secp256k1_frost_share_load(const secp256k1_context* ctx, secp256k1_sc
 
 int secp256k1_frost_share_serialize(const secp256k1_context* ctx, unsigned char *out32, const secp256k1_frost_share* share) {
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(out32 != NULL);
-    VERIFY_CHECK(share != NULL);
+    ARG_CHECK(out32 != NULL);
+    ARG_CHECK(share != NULL);
     memcpy(out32, &share->data[4], 32);
     return 1;
 }

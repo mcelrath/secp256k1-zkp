@@ -261,14 +261,16 @@ int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secn
     int i;
     unsigned char pk_ser[32];
     unsigned char *pk_ser_ptr = NULL;
+    unsigned char sk_ser[32];
+    unsigned char *sk_ser_ptr = NULL;
     int ret = 1;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(secnonce != NULL);
+    ARG_CHECK(secnonce != NULL);
     memset(secnonce, 0, sizeof(*secnonce));
-    VERIFY_CHECK(pubnonce != NULL);
+    ARG_CHECK(pubnonce != NULL);
     memset(pubnonce, 0, sizeof(*pubnonce));
-    VERIFY_CHECK(session_id32 != NULL);
+    ARG_CHECK(session_id32 != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     if (agg_share == NULL) {
         /* Check in constant time that the session_id is not 0 as a
@@ -281,22 +283,26 @@ int secp256k1_frost_nonce_gen(const secp256k1_context* ctx, secp256k1_frost_secn
         memset(&acc, 0, sizeof(acc));
     }
 
-    /* Check that the agg_share is valid to be able to sign for it later. */
     if (agg_share != NULL) {
+        /* Check that the agg_share is valid to be able to sign for it later. */
         secp256k1_scalar sk;
+        int ret_tmp;
+
         ret &= secp256k1_frost_share_load(ctx, &sk, agg_share);
         secp256k1_scalar_clear(&sk);
+
+        ret_tmp = secp256k1_frost_share_serialize(ctx, sk_ser, agg_share);
+        VERIFY_CHECK(ret_tmp);
+        sk_ser_ptr = sk_ser;
     }
 
     if (agg_pk != NULL) {
-        int ret_tmp;
-
-        ret_tmp = secp256k1_xonly_pubkey_serialize(ctx, pk_ser, agg_pk);
-        /* Serialization can not fail because the loaded point can not be infinity. */
-        VERIFY_CHECK(ret_tmp);
+        if (!secp256k1_xonly_pubkey_serialize(ctx, pk_ser, agg_pk)) {
+            return 0;
+        }
         pk_ser_ptr = pk_ser;
     }
-    secp256k1_nonce_function_frost(k, session_id32, msg32, &agg_share->data[4], pk_ser_ptr, extra_input32);
+    secp256k1_nonce_function_frost(k, session_id32, msg32, sk_ser_ptr, pk_ser_ptr, extra_input32);
     VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[0]));
     VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[1]));
     VERIFY_CHECK(!secp256k1_scalar_eq(&k[0], &k[1]));
