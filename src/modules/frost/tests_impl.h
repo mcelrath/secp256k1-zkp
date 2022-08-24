@@ -141,6 +141,7 @@ void frost_api_tests(void) {
     secp256k1_frost_secnonce secnonce[5];
     secp256k1_frost_secnonce invalid_secnonce;
     secp256k1_frost_pubnonce pubnonce[5];
+    unsigned char pubnonce_ser[66];
     secp256k1_frost_pubnonce inf_pubnonce[5];
     secp256k1_frost_pubnonce invalid_pubnonce;
     unsigned char msg[32];
@@ -489,6 +490,36 @@ void frost_api_tests(void) {
     /* Every in-argument except session_id can be NULL */
     CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[0], &pubnonce[0], session_id[0], NULL, NULL, NULL, NULL) == 1);
     CHECK(secp256k1_frost_nonce_gen(sign, &secnonce[1], &pubnonce[1], session_id[1], &agg_share[1], NULL, NULL, NULL) == 1);
+
+    /** Serialize and parse public nonces **/
+    ecount = 0;
+    CHECK(secp256k1_frost_pubnonce_serialize(none, NULL, &pubnonce[0]) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_frost_pubnonce_serialize(none, pubnonce_ser, NULL) == 0);
+    CHECK(ecount == 2);
+    CHECK(memcmp_and_randomize(pubnonce_ser, zeros68, sizeof(pubnonce_ser)) == 0);
+    CHECK(secp256k1_frost_pubnonce_serialize(none, pubnonce_ser, &invalid_pubnonce) == 0);
+    CHECK(ecount == 3);
+    CHECK(memcmp_and_randomize(pubnonce_ser, zeros68, sizeof(pubnonce_ser)) == 0);
+    CHECK(secp256k1_frost_pubnonce_serialize(none, pubnonce_ser, &pubnonce[0]) == 1);
+
+    ecount = 0;
+    CHECK(secp256k1_frost_pubnonce_parse(none, &pubnonce[0], pubnonce_ser) == 1);
+    CHECK(secp256k1_frost_pubnonce_parse(none, NULL, pubnonce_ser) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_frost_pubnonce_parse(none, &pubnonce[0], NULL) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_frost_pubnonce_parse(none, &pubnonce[0], zeros68) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_frost_pubnonce_parse(none, &pubnonce[0], pubnonce_ser) == 1);
+
+    {
+        /* Check that serialize and parse results in the same value */
+        secp256k1_frost_pubnonce tmp;
+        CHECK(secp256k1_frost_pubnonce_serialize(none, pubnonce_ser, &pubnonce[0]) == 1);
+        CHECK(secp256k1_frost_pubnonce_parse(none, &tmp, pubnonce_ser) == 1);
+        CHECK(secp256k1_memcmp_var(&tmp, &pubnonce[0], sizeof(tmp)) == 0);
+    }
 
     /** cleanup **/
     secp256k1_context_destroy(none);

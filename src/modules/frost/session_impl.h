@@ -147,9 +147,9 @@ int secp256k1_frost_pubnonce_serialize(const secp256k1_context* ctx, unsigned ch
     int i;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(out66 != NULL);
+    ARG_CHECK(out66 != NULL);
     memset(out66, 0, 66);
-    VERIFY_CHECK(nonce != NULL);
+    ARG_CHECK(nonce != NULL);
 
     if (!secp256k1_frost_pubnonce_load(ctx, ge, nonce)) {
         return 0;
@@ -169,8 +169,8 @@ int secp256k1_frost_pubnonce_parse(const secp256k1_context* ctx, secp256k1_frost
     int i;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(nonce != NULL);
-    VERIFY_CHECK(in66 != NULL);
+    ARG_CHECK(nonce != NULL);
+    ARG_CHECK(in66 != NULL);
     for (i = 0; i < 2; i++) {
         if (!secp256k1_eckey_pubkey_parse(&ge[i], &in66[33*i], 33)) {
             return 0;
