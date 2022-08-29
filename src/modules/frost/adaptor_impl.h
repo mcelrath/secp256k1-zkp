@@ -18,8 +18,8 @@
 int secp256k1_frost_nonce_parity(const secp256k1_context* ctx, int *nonce_parity, const secp256k1_frost_session *session) {
     secp256k1_frost_session_internal session_i;
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(nonce_parity != NULL);
-    VERIFY_CHECK(session != NULL);
+    ARG_CHECK(nonce_parity != NULL);
+    ARG_CHECK(session != NULL);
 
     if (!secp256k1_frost_session_load(ctx, &session_i, session)) {
         return 0;
@@ -35,10 +35,10 @@ int secp256k1_frost_adapt(const secp256k1_context* ctx, unsigned char *sig64, co
     int ret = 1;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(sig64 != NULL);
-    VERIFY_CHECK(pre_sig64 != NULL);
-    VERIFY_CHECK(sec_adaptor32 != NULL);
-    VERIFY_CHECK(nonce_parity == 0 || nonce_parity == 1);
+    ARG_CHECK(sig64 != NULL);
+    ARG_CHECK(pre_sig64 != NULL);
+    ARG_CHECK(sec_adaptor32 != NULL);
+    ARG_CHECK(nonce_parity == 0 || nonce_parity == 1);
 
     secp256k1_scalar_set_b32(&s, &pre_sig64[32], &overflow);
     if (overflow) {
@@ -75,10 +75,10 @@ int secp256k1_frost_extract_adaptor(const secp256k1_context* ctx, unsigned char 
     int ret = 1;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(sec_adaptor32 != NULL);
-    VERIFY_CHECK(sig64 != NULL);
-    VERIFY_CHECK(pre_sig64 != NULL);
-    VERIFY_CHECK(nonce_parity == 0 || nonce_parity == 1);
+    ARG_CHECK(sec_adaptor32 != NULL);
+    ARG_CHECK(sig64 != NULL);
+    ARG_CHECK(pre_sig64 != NULL);
+    ARG_CHECK(nonce_parity == 0 || nonce_parity == 1);
 
     secp256k1_scalar_set_b32(&t, &sig64[32], &overflow);
     ret &= !overflow;

@@ -194,8 +194,8 @@ int secp256k1_frost_aggnonce_parse(const secp256k1_context* ctx, secp256k1_frost
 
 int secp256k1_frost_partial_sig_serialize(const secp256k1_context* ctx, unsigned char *out32, const secp256k1_frost_partial_sig* sig) {
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(out32 != NULL);
-    VERIFY_CHECK(sig != NULL);
+    ARG_CHECK(out32 != NULL);
+    ARG_CHECK(sig != NULL);
     memcpy(out32, &sig->data[4], 32);
     return 1;
 }
@@ -204,8 +204,8 @@ int secp256k1_frost_partial_sig_parse(const secp256k1_context* ctx, secp256k1_fr
     secp256k1_scalar tmp;
     int overflow;
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(sig != NULL);
-    VERIFY_CHECK(in32 != NULL);
+    ARG_CHECK(sig != NULL);
+    ARG_CHECK(in32 != NULL);
 
     secp256k1_scalar_set_b32(&tmp, in32, &overflow);
     if (overflow) {
@@ -431,9 +431,10 @@ int secp256k1_frost_nonce_process(const secp256k1_context* ctx, secp256k1_frost_
     secp256k1_scalar l;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(session != NULL);
-    VERIFY_CHECK(msg32 != NULL);
-    VERIFY_CHECK(pubnonces != NULL);
+    ARG_CHECK(session != NULL);
+    ARG_CHECK(msg32 != NULL);
+    ARG_CHECK(pubnonces != NULL);
+    ARG_CHECK(pubkeys != NULL);
     ARG_CHECK(n_pubnonces > 1);
 
     if (!secp256k1_xonly_pubkey_serialize(ctx, agg_pk32, agg_pk)) {
@@ -521,7 +522,7 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
 
     VERIFY_CHECK(ctx != NULL);
 
-    VERIFY_CHECK(secnonce != NULL);
+    ARG_CHECK(secnonce != NULL);
     /* Fails if the magic doesn't match */
     ret = secp256k1_frost_secnonce_load(ctx, k, secnonce);
     /* Set nonce to zero to avoid nonce reuse. This will cause subsequent calls
@@ -532,9 +533,9 @@ int secp256k1_frost_partial_sign(const secp256k1_context* ctx, secp256k1_frost_p
         return 0;
     }
 
-    VERIFY_CHECK(partial_sig != NULL);
-    VERIFY_CHECK(agg_share != NULL);
-    VERIFY_CHECK(session != NULL);
+    ARG_CHECK(partial_sig != NULL);
+    ARG_CHECK(agg_share != NULL);
+    ARG_CHECK(session != NULL);
 
     if (!secp256k1_frost_share_load(ctx, &sk, agg_share)) {
         secp256k1_frost_partial_sign_clear(&sk, k);
@@ -581,10 +582,10 @@ int secp256k1_frost_partial_sig_verify(const secp256k1_context* ctx, const secp2
     secp256k1_ge pkp;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(partial_sig != NULL);
-    VERIFY_CHECK(pubnonce != NULL);
-    VERIFY_CHECK(share_pk != NULL);
-    VERIFY_CHECK(session != NULL);
+    ARG_CHECK(partial_sig != NULL);
+    ARG_CHECK(pubnonce != NULL);
+    ARG_CHECK(share_pk != NULL);
+    ARG_CHECK(session != NULL);
 
     if (!secp256k1_frost_session_load(ctx, &session_i, session)) {
         return 0;
@@ -636,9 +637,9 @@ int secp256k1_frost_partial_sig_agg(const secp256k1_context* ctx, unsigned char 
     secp256k1_frost_session_internal session_i;
 
     VERIFY_CHECK(ctx != NULL);
-    VERIFY_CHECK(sig64 != NULL);
-    VERIFY_CHECK(session != NULL);
-    VERIFY_CHECK(partial_sigs != NULL);
+    ARG_CHECK(sig64 != NULL);
+    ARG_CHECK(session != NULL);
+    ARG_CHECK(partial_sigs != NULL);
     ARG_CHECK(n_sigs > 0);
 
     if (!secp256k1_frost_session_load(ctx, &session_i, session)) {
