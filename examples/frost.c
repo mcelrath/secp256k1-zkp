@@ -196,11 +196,12 @@ int tweak(const secp256k1_context* ctx, secp256k1_xonly_pubkey *agg_pk, secp256k
 int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, struct signer *signer, const unsigned char* msg32, secp256k1_xonly_pubkey *agg_pk, unsigned char *sig64, const secp256k1_frost_tweak_cache *cache) {
     int i;
     int signer_id = 0;
-    int signers = 0;
+    int signers[THRESHOLD];
+    int is_signer[N_SIGNERS];
     const secp256k1_frost_pubnonce *pubnonces[THRESHOLD];
     const secp256k1_xonly_pubkey *pubkeys[THRESHOLD];
     const secp256k1_frost_partial_sig *partial_sigs[THRESHOLD];
-    unsigned char seed[THRESHOLD];
+    unsigned int seed;
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
@@ -226,27 +227,29 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
         if (!secp256k1_frost_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, &signer_secrets[i].agg_share, msg32, agg_pk, NULL)) {
             return 0;
         }
+        is_signer[i] = 0; /* Initialize is_signer */
     }
     /* Select a random subset of signers */
     for (i = 0; i < THRESHOLD; i++) {
         while (1) {
-            if (!fill_random(&seed[i], 1)) {
+            if (!fill_random((unsigned char*)&seed, sizeof(seed))) {
                 return 0;
             }
-            signer_id = seed[i] % N_SIGNERS;
+            signer_id = seed % N_SIGNERS;
             /* Check if signer has already been assigned */
-            if (!(signers & (1 << signer_id))) {
+            if (!is_signer[signer_id]) {
+                is_signer[signer_id] = 1;
+                signers[i] = signer_id;
                 break;
             }
         }
         /* Mark signer as assigned */
-        signers = signers ^ (1 << signer_id);
         pubnonces[i] = &signer[signer_id].pubnonce;
         pubkeys[i] = &signer[signer_id].pubkey;
     }
     /* Signing communication round 1: Exchange nonces */
     for (i = 0; i < THRESHOLD; i++) {
-        signer_id = seed[i] % N_SIGNERS;
+        signer_id = signers[i];
         if (!secp256k1_frost_nonce_process(ctx, &signer[signer_id].session, pubnonces, THRESHOLD, msg32, agg_pk, &signer[signer_id].pubkey, pubkeys, cache, NULL)) {
             return 0;
         }
@@ -262,7 +265,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets *signer_secrets, st
     /* Communication round 2: A production system would exchange
      * partial signatures here before moving on. */
     for (i = 0; i < THRESHOLD; i++) {
-        signer_id = seed[i] % N_SIGNERS;
+        signer_id = signers[i];
         /* To check whether signing was successful, it suffices to either verify
          * the aggregate signature with the aggregate public key using
          * secp256k1_schnorrsig_verify, or verify all partial signatures of all
